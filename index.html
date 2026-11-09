@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ML Coding & System Design Prep</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+<style>
+:root { --fg:#1f2328; --muted:#656d76; --bg:#fff; --card:#f6f8fa; --accent:#0969da; --border:#d0d7de; }
+* { box-sizing: border-box; }
+body { margin:0; font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif; color:var(--fg); background:var(--bg); }
+nav { position:fixed; top:0; left:0; bottom:0; width:230px; padding:24px 18px; border-right:1px solid var(--border); overflow-y:auto; background:#fafbfc; }
+nav h1 { font-size:16px; margin:0 0 16px; }
+nav a { display:block; color:var(--fg); text-decoration:none; padding:4px 0; font-size:14px; }
+nav a:hover { color:var(--accent); }
+nav .sub { padding-left:12px; font-size:13px; color:var(--muted); }
+main { margin-left:230px; padding:32px 48px 80px; max-width:1100px; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:6px; margin-top:48px; }
+h3 { margin-top:28px; }
+a { color:var(--accent); }
+table { border-collapse:collapse; width:100%; margin:12px 0; font-size:14px; }
+th,td { border:1px solid var(--border); padding:6px 10px; vertical-align:top; text-align:left; }
+th { background:var(--card); }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:4px 18px; }
+.callout { border-left:4px solid var(--accent); background:#ddf4ff; padding:10px 14px; border-radius:4px; margin:14px 0; }
+.muted { color:var(--muted); }
+.cols2 { columns:2; column-gap:32px; }
+details { border:1px solid var(--border); border-radius:8px; padding:8px 14px; margin:10px 0; }
+summary { cursor:pointer; }
+code { background:var(--card); padding:1px 5px; border-radius:4px; font-size:13px; }
+.codeblock { border:1px solid var(--border); border-radius:8px; margin:22px 0; overflow:hidden; }
+.codehead { display:flex; justify-content:space-between; background:var(--card); padding:8px 14px; font-weight:600; font-size:14px; border-bottom:1px solid var(--border); }
+.codehead button { border:1px solid var(--border); background:#fff; border-radius:4px; cursor:pointer; font-size:12px; }
+pre { margin:0; max-height:640px; overflow:auto; }
+pre code { background:none; padding:14px 16px !important; font-size:12.5px; line-height:1.5; }
+@media (max-width:900px) { nav { display:none; } main { margin-left:0; padding:20px; } .grid2 { grid-template-columns:1fr; } .cols2 { columns:1; } }
+</style>
+</head>
+<body>
+<nav>
+<h1>ML Interview Prep</h1>
+<a href="#overview">0. 面试形式</a>
+<a href="#plan">1. 准备计划</a>
+<a href="#mlcoding">2. ML Coding 题库</a>
+<a href="#sysdesign">3. System Design</a>
+<a href="#numbers">4. 要背熟的数字</a>
+<a href="#code">5. 代码</a>
+<a class="sub" href="#c01">01_mlp_numpy.py</a><a class="sub" href="#c02">02_norms_numpy.py</a><a class="sub" href="#c03">03_attention_numpy.py</a><a class="sub" href="#c04">04_gpt_torch.py</a><a class="sub" href="#c05">05_optimizers_numpy.py</a><a class="sub" href="#c06">06_debug_training.py</a><a class="sub" href="#c07">07_classic_ml_numpy.py</a><a class="sub" href="#c08">08_rl_losses_torch.py</a><a class="sub" href="#c09">09_sysdesign_snippets.py</a>
+</nav>
+<main>
+<h1 style="margin-top:0">ML Coding &amp; System Design 面试准备</h1>
+<p class="muted">所有代码都实际跑过（numpy + PyTorch CPU），每个脚本末尾有 assert 自检，跑到 <code>OK</code> 就说明正确。</p>
+<section id="overview">
+<h2>0. 面试形式</h2>
+<div class="grid2">
+<div class="card">
+<h3>ML Coding</h3>
+<ul>
+<li>Google Colab，basic Python 环境</li>
+<li><b>不能用 AI coding assistant</b>（练习时也要关掉 Colab 的 AI 补全）</li>
+<li>考 "foundational ML concepts"：从零手写 ML 组件，不是 LeetCode</li>
+<li>边写边讲：先说 shape 和思路，写完一段就跑一下</li>
+</ul>
+</div>
+<div class="card">
+<h3>System Design</h3>
+<ul>
+<li>按你的背景和你可能要做的工作出题</li>
+<li>共享屏幕，用 Excalidraw 画图</li>
+<li>中途可能在 Colab 里写一小段代码</li>
+<li>大概率是 research infra / agent 系统方向，而不是"设计 Twitter"</li>
+</ul>
+</div>
+</div>
+<div class="callout">回 coordinator 时可以顺便问：每轮多长、面试官是谁。知道是谁就能查他的研究方向，大致猜到题目的侧重。</div>
+</section>
+
+<section id="plan">
+<h2>1. 准备计划</h2>
+<table>
+<tr><th>时间</th><th>ML Coding</th><th>System Design</th></tr>
+<tr><td>Day 1</td><td>MLP + softmax/CE + grad check（01）；LayerNorm/BatchNorm backward（02）</td><td>画一张自己做过的系统的架构图，15 分钟能讲清楚（只讲 high-level）</td></tr>
+<tr><td>Day 2</td><td>Attention + causal/padding mask（03）；GPT block + RoPE + KV cache + sampling（04）</td><td>Mock：自我改进 / 自动化 ML 实验 agent 系统（题 A）</td></tr>
+<tr><td>Day 3</td><td>Optimizers（05）；Debug 题（06）；经典 ML（07）</td><td>Mock：大规模 agent eval / rollout 平台（题 B）</td></tr>
+<tr><td>Day 4</td><td>RL losses：REINFORCE / GAE / PPO / GRPO（08）</td><td>Mock：agent RL 训练 pipeline（题 C）+ 推理服务（题 D）</td></tr>
+<tr><td>面试前一天</td><td>不看答案，从空白 Colab 重写 03 + 04，计时 30 分钟</td><td>写一遍 09 里的 worker pool / bandit / bootstrap；背 §4 的数字</td></tr>
+</table>
+<p class="muted">练法：先看题目自己写，写完再对照 <a href="#code">代码</a>。每个脚本都有 assert 自检，<code>python 0X_xxx.py</code> 能跑到 OK 就算写对了。</p>
+</section>
+
+<section id="mlcoding">
+<h2>2. ML Coding 题库</h2>
+
+<h3>2.1 从零写模型组件（最常见）</h3>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>numpy 手写 MLP forward + backward，gradient check 验证</td><td>链式法则、每个矩阵的 shape、ReLU 的 backward、centered finite difference</td><td><a href="#c01">01</a></td></tr>
+<tr><td>softmax + cross-entropy</td><td>减掉每行最大值（log-sum-exp）；梯度 = (softmax − onehot)/N</td><td><a href="#c01">01</a></td></tr>
+<tr><td>self-attention / multi-head attention</td><td>除以 √d_head；mask 要在 softmax 之前加；causal 和 padding mask 怎么组合；(B,T,D)→(B,H,T,Dh) 的 reshape/transpose</td><td><a href="#c03">03</a></td></tr>
+<tr><td>Transformer block</td><td>pre-norm vs post-norm；残差；MLP 4× 扩展；SwiGLU</td><td><a href="#c04">04</a></td></tr>
+<tr><td>位置编码：sinusoidal / RoPE</td><td>RoPE 是对 q、k 两两维度做旋转；只作用在 q、k 上，不作用在 v 上；使用 KV cache 时 position offset 要对</td><td><a href="#c04">04</a></td></tr>
+<tr><td>LayerNorm / RMSNorm / BatchNorm forward + backward</td><td>归一化的维度；BN 训练和推理行为不同（running stats）；LN backward 的紧凑公式</td><td><a href="#c02">02</a></td></tr>
+</table>
+
+<h3>2.2 训练相关</h3>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>手写 SGD+momentum / Adam / AdamW</td><td>bias correction；Adam 里的 L2 ≠ AdamW 的 decoupled weight decay（L2 会被 1/√v 缩放）</td><td><a href="#c05">05</a></td></tr>
+<tr><td>完整训练循环（小 GPT 或 MLP，loss 要降）</td><td>zero_grad 放在哪；model.train()/eval()；数据要 shuffle</td><td><a href="#c04">04</a></td></tr>
+<tr><td>LR schedule：warmup + cosine</td><td>为什么要 warmup（Adam 初期二阶矩估计不准，训练早期不稳定）</td><td><a href="#c04">04</a></td></tr>
+<tr><td>gradient accumulation / clipping</td><td>accumulation 时 loss 要除以累积步数；clip 的是全局 norm</td><td><a href="#c04">04</a></td></tr>
+</table>
+
+<h3>2.3 推理和采样</h3>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>greedy / temperature / top-k / top-p</td><td>top-p 要保留"累计概率刚好 ≥ p 的最小前缀"，边界别写错；temperature 不能为 0（要单独处理成 greedy）</td><td><a href="#c04">04</a></td></tr>
+<tr><td>KV cache：先写 naive，再改成带 cache</td><td>prefill 和 decode 两个阶段；cache 的 shape (B,H,T,Dh)；带 cache 和不带 cache 的结果要完全一致；每生成一个 token 的复杂度从 O(T²) 降到 O(T)</td><td><a href="#c04">04</a></td></tr>
+<tr><td>beam search（少见）</td><td>length penalty；EOS 的处理</td><td>—</td></tr>
+</table>
+
+<h3>2.4 Debug 题</h3>
+<p>给一段训练代码，问 loss 为什么不降或者变成 NaN。常见埋的 bug：</p>
+<ul class="cols2">
+<li>忘了 <code>zero_grad()</code></li>
+<li><code>F.cross_entropy</code> 前面又做了一次 softmax</li>
+<li>mask 方向反了</li>
+<li>softmax / argmax 用错了维度</li>
+<li>logits 和 labels flatten 的顺序不一致</li>
+<li>广播错误（(N,) 和 (N,1) 相减）</li>
+<li>learning rate 太大 / 没有 warmup</li>
+<li>数据没有 shuffle</li>
+<li>eval 时没调 <code>model.eval()</code> / 没加 <code>no_grad</code></li>
+<li>label 是 float 而不是 long</li>
+<li>log(0) 导致 NaN</li>
+<li>logging 时没 <code>.item()</code> 或 <code>.detach()</code>，导致内存泄漏</li>
+</ul>
+<p>练习：<a href="#c06">06</a> 里有一个埋了 6 个 bug 的版本，先自己找，再看修好的版本。</p>
+
+<h3>2.5 经典 ML（偶尔考）</h3>
+<p>logistic regression + GD、k-means（k-means++ 初始化，多跑几次初始化取最优）、PCA（用 SVD 实现）、kNN（向量化算距离）、conv2d / im2col。→ <a href="#c07">07</a></p>
+
+<h3>2.6 RL（做 agent 的公司可能考）</h3>
+<table>
+<tr><th>题目</th><th>要点</th></tr>
+<tr><td>REINFORCE + baseline</td><td>∇E[R] = E[∇log π · A]；baseline 能降方差，而且不引入 bias</td></tr>
+<tr><td>GAE</td><td>δ<sub>t</sub> = r<sub>t</sub> + γV(s<sub>t+1</sub>)(1−done) − V(s<sub>t</sub>)；从后往前递推</td></tr>
+<tr><td>PPO clipped objective</td><td>ratio = exp(logp_new − logp_old)；对 ratio·A 和 clip(ratio)·A 取 min；只在 response token 上算</td></tr>
+<tr><td>GRPO</td><td>同一个 prompt 采样 G 个回答，在组内标准化 reward 得到 advantage；不需要 value network</td></tr>
+<tr><td>KL penalty</td><td>k3 估计器：exp(Δ) − Δ − 1，非负且无偏</td></tr>
+</table>
+<p>→ <a href="#c08">08</a></p>
+
+<h3>2.7 现场节奏</h3>
+<ol>
+<li>复述题目，确认输入输出的 shape 和边界条件（1 分钟）</li>
+<li>口头讲思路，标出每个张量的 shape（2 分钟）</li>
+<li>先写最简单、能跑通的版本，跑一下</li>
+<li>加测试：拿 PyTorch 自带实现做参照，或者 gradient check，或者 sanity check（概率之和为 1、mask 掉的位置为 0）</li>
+<li>再优化：数值稳定、向量化，讲清楚复杂度和显存</li>
+</ol>
+<div class="callout">最常丢分的地方：shape 和广播出错、写不出数值稳定的版本、写完不验证。</div>
+</section>
+
+<section id="sysdesign">
+<h2>3. System Design</h2>
+
+<h3>3.1 时间分配（按 45–60 分钟算）</h3>
+<ol>
+<li><b>澄清需求，5 分钟</b>：目标是什么、规模多大（同时跑多少任务、算力预算多少）、怎么衡量成功、哪些地方允许出错</li>
+<li><b>整体架构，10 分钟</b>：先把各组件和数据流画出来，不要一开始就钻细节</li>
+<li><b>深入 2–3 个组件，20 分钟</b>：主动选你最强的部分，同时看面试官想往哪个方向追问</li>
+<li><b>规模、失败和取舍，10 分钟</b>：瓶颈在哪、挂了怎么恢复、成本怎么控制</li>
+<li><b>怎么证明系统真的有效，5 分钟</b>：research 公司特别看重这一块</li>
+</ol>
+
+<h3>3.2 题库</h3>
+<details open><summary><b>A. 自我改进 / 自动化 ML research 的 agent 系统</b>（最可能）</summary>
+<p>给一个任务和评估指标，系统自己提方案、跑实验、迭代。</p>
+<ul>
+<li><b>生成候选</b>：LLM 提方案，加上历史尝试记录（memory），避免重复试一样的想法；历史记录怎么压缩后喂给 LLM</li>
+<li><b>搜索策略</b>：tree search、进化、bandit（UCB / Thompson sampling）、successive halving。讲清楚怎么平衡探索和利用，以及预算怎么分配</li>
+<li><b>执行</b>：每个候选在沙箱里跑，用容器隔离，设好超时、CPU/GPU/内存限制和网络隔离</li>
+<li><b>评估</b>：分开 held-out 和 validation 数据，用多个 seed 处理噪声，结果要做显著性检验（paired bootstrap）</li>
+<li><b>风险</b>：过拟合 eval、reward hacking（改 eval 代码、读 test label、硬编码答案）、eval 泄漏。对策：eval 放在 agent 碰不到的环境里，把 validation 和 test 分开，加 sanity check，定期人工抽查</li>
+<li><b>工程</b>：结果缓存（按代码 + 配置 + seed 做 hash）、重复候选去重、失败重试，每个改进怎么来的、跑出什么结果都要能追溯和复现</li>
+<li><b>指标</b>：单位成本带来的提升、多久找到最优解、改进能不能迁移到 held-out 任务</li>
+</ul>
+</details>
+<details><summary><b>B. 大规模 agent eval / rollout 平台</b></summary>
+<ul>
+<li>任务队列 + 调度（K8s / Ray），GPU 推理和 CPU 沙箱分开调度和扩缩容</li>
+<li>LLM 调用走一个单独的推理服务（vLLM / SGLang），做 batching 和限流；用外部 API 时要处理 rate limit、重试和成本上限</li>
+<li>沙箱：镜像预构建 + 缓存，冷启动要快；多步工具调用时环境状态怎么管理；超时处理</li>
+<li>结果的确定性：固定 seed / temperature，记录模型版本和镜像 hash</li>
+<li>存储：结构化结果放数据库，完整 trajectory 放对象存储；能按任务、模型、版本查询和对比</li>
+<li>可观测性：dashboard、失败原因自动分类（环境错误 / 超时 / 模型错误）、成本监控</li>
+<li>规模估算示例：1 万个 rollout × 每个 10 分钟 ÷ 2 小时完成 → 大约 830 个并发沙箱</li>
+</ul>
+</details>
+<details><summary><b>C. Agent RL 训练 pipeline</b></summary>
+<ul>
+<li>actor（vLLM 生成 rollout）和 learner（FSDP / Megatron 训练）分开部署；同步训练 vs 异步训练</li>
+<li>异步训练时数据 staleness 怎么处理：限制 policy 版本差、用 importance ratio 修正或 clip、丢掉太旧的数据</li>
+<li>权重同步到 actor：NCCL broadcast / 写到共享存储，多久同步一次</li>
+<li>奖励：verifier / 单测 / reward model；长任务奖励稀疏，credit assignment 怎么做；防 reward hacking</li>
+<li>多轮工具调用：环境放在单独的服务里；tool 返回的 token 要 mask 掉，不算进 loss</li>
+<li>长尾问题：有些 rollout 特别长，会拖慢整批 → 部分 rollout 先训、超时截断、动态 batch</li>
+<li>监控：reward 曲线、KL、entropy、response 长度、各种 clip 被触发的比例</li>
+</ul>
+</details>
+<details><summary><b>D. LLM 推理服务</b></summary>
+<ul>
+<li>continuous batching；prefill 和 decode 两个阶段的特点不同（prefill 受算力限制，decode 受显存带宽限制）</li>
+<li>KV cache 显存管理：PagedAttention、prefix caching（相同的 system prompt / few-shot 前缀可以复用）</li>
+<li>throughput 和 latency 的取舍：batch size、TTFT（首 token 延迟）、TPOT（每个 token 的生成时间）</li>
+<li>多模型路由、量化、speculative decoding、tensor parallel</li>
+</ul>
+</details>
+<details><summary><b>E. 其他可能的题</b></summary>
+<ul>
+<li>训练数据 pipeline：爬取 → 去重（MinHash）→ 质量过滤 → 配比；怎么防止 eval 数据污染训练数据（n-gram overlap 检测）</li>
+<li>大规模分布式训练：DP / TP / PP / FSDP 分别切什么；怎么存 checkpoint，节点挂了怎么恢复</li>
+<li>实验追踪和复现系统：怎么管理配置、代码版本（git commit）、随机种子、数据版本和产出文件</li>
+<li>reward model / verifier 服务，以及怎么防 reward hacking</li>
+</ul>
+</details>
+
+<h3>3.3 几乎每道题都会追问的点</h3>
+<ul class="cols2">
+<li><b>规模估算</b>：多少张 GPU、跑多久、花多少钱、能撑多少并发</li>
+<li><b>出错了怎么办</b>：任务挂掉、节点挂掉、结果不确定（同样输入跑出不同结果）、重试要幂等</li>
+<li><b>评估可信度</b>：噪声怎么处理、要不要多个 seed、held-out 集、显著性检验</li>
+<li><b>安全和隔离</b>：沙箱逃逸、网络访问、资源耗尽</li>
+<li><b>取舍</b>：为什么选同步而不是异步，代价是什么，怎么缓解</li>
+<li><b>演进</b>：先做 MVP，规模扩大 10 倍时哪里先成为瓶颈</li>
+</ul>
+
+<h3>3.4 中途可能要写的代码</h3>
+<p>一般是小组件，提前写一遍就不会卡（→ <a href="#c09">09</a>）：async worker pool 加超时、重试和指数退避；UCB bandit；paired bootstrap 显著性检验；结果缓存和去重；successive halving。</p>
+
+<h3>3.5 准备清单</h3>
+<ul>
+<li>☐ 在 Excalidraw 里画一张自己做过的系统的架构图，15 分钟能讲完。只讲 high-level，不提客户名字和项目细节</li>
+<li>☐ A / B / C / D 每类题各做一次 mock，计时 45 分钟，大声讲出来，边讲边画</li>
+<li>☐ 练画图速度：真到面试时，大部分人卡在画图慢，而不是不会设计</li>
+<li>☐ 每个设计里都主动讲 trade-off："这里选 X，代价是 Y，所以加了 Z 来缓解"</li>
+<li>☐ 看一下对方公司的公开 blog / 论文和面试官的背景</li>
+</ul>
+</section>
+
+<section id="numbers">
+<h2>4. 要背熟的数字</h2>
+<table>
+<tr><th>项目</th><th>数</th></tr>
+<tr><td>参数显存（bf16）</td><td>2 bytes × 参数量：7B 约 14GB，70B 约 140GB</td></tr>
+<tr><td>训练显存（mixed precision + Adam）</td><td>约 16 bytes / 参数（bf16 权重 2、梯度 2、fp32 master 权重 4、Adam m 和 v 共 8），还没算 activation</td></tr>
+<tr><td>KV cache 大小</td><td>2 (K,V) × 层数 × KV 头数 × head_dim × 2 bytes，算出来是每个 token 的大小；Llama-2-7B（32 层，32 头 × 128）约 0.5MB/token，4k 上下文约 2GB；用 GQA 可以按比例缩小</td></tr>
+<tr><td>训练 FLOPs</td><td>≈ 6 × 参数量 × token 数（forward 2N + backward 4N）</td></tr>
+<tr><td>推理 FLOPs</td><td>≈ 2 × 参数量 / token</td></tr>
+<tr><td>H100</td><td>约 1000 TFLOPS（bf16 dense）、80GB HBM、带宽约 3.35 TB/s；实际 MFU 一般在 40–50%</td></tr>
+<tr><td>decode 吞吐上限（batch 为 1）</td><td>约等于显存带宽 ÷ 权重大小：7B bf16 在 H100 上约 3.35TB/s ÷ 14GB ≈ 240 tokens/s</td></tr>
+<tr><td>Attention 复杂度</td><td>时间 O(T²·d)，score 矩阵占显存 O(T²)（FlashAttention 不把整个矩阵放进显存）</td></tr>
+</table>
+</section>
+
+<section id="code">
+<h2>5. 代码</h2>
+<p>在本地或 Colab 运行：<code>pip install numpy torch</code>，然后 <code>python 01_mlp_numpy.py</code>。建议先自己从空白写一遍，再来对照。</p>
+<ul><li><a href="#c01">01_mlp_numpy.py</a> — MLP + softmax/CE + grad check (numpy)</li><li><a href="#c02">02_norms_numpy.py</a> — LayerNorm / RMSNorm / BatchNorm backward (numpy)</li><li><a href="#c03">03_attention_numpy.py</a> — Multi-head attention + masks (numpy)</li><li><a href="#c04">04_gpt_torch.py</a> — Mini GPT: RoPE, KV cache, sampling, AdamW, warmup/cosine (torch)</li><li><a href="#c05">05_optimizers_numpy.py</a> — SGD / Adam / AdamW from scratch (numpy, vs torch)</li><li><a href="#c06">06_debug_training.py</a> — Debug drill: buggy vs fixed training loop (torch)</li><li><a href="#c07">07_classic_ml_numpy.py</a> — Classic ML: logreg, k-means, PCA, kNN, conv2d im2col (numpy)</li><li><a href="#c08">08_rl_losses_torch.py</a> — RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)</li><li><a href="#c09">09_sysdesign_snippets.py</a> — System-design snippets: worker pool, UCB, bootstrap, cache, halving</li></ul>
+<div class="codeblock" id="c01">
+<div class="codehead"><span>01_mlp_numpy.py — MLP + softmax/CE + grad check (numpy)</span>
+<span><a href="code/01_mlp_numpy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;MLP from scratch in numpy: forward, backward, softmax-CE, gradient check, training.
+
+Interview checklist:
+- say shapes out loud: X (N, D), W1 (D, H), b1 (H,), W2 (H, C), b2 (C,)
+- softmax must subtract the row max (log-sum-exp trick)
+- dL/dlogits = (softmax - onehot) / N
+- verify with a centered finite-difference gradient check
+&quot;&quot;&quot;
+import numpy as np
+
+
+def softmax(z):
+    z = z - z.max(axis=1, keepdims=True)          # numerical stability
+    e = np.exp(z)
+    return e / e.sum(axis=1, keepdims=True)
+
+
+def log_softmax(z):
+    z = z - z.max(axis=1, keepdims=True)
+    return z - np.log(np.exp(z).sum(axis=1, keepdims=True))
+
+
+def cross_entropy(logits, y):
+    &quot;&quot;&quot;logits (N, C), y (N,) int labels -&gt; scalar mean loss&quot;&quot;&quot;
+    N = logits.shape[0]
+    return -log_softmax(logits)[np.arange(N), y].mean()
+
+
+class MLP:
+    def __init__(self, d_in, d_hidden, d_out, seed=0):
+        rng = np.random.default_rng(seed)
+        # He init for ReLU
+        self.params = {
+            &quot;W1&quot;: rng.normal(0, np.sqrt(2.0 / d_in), (d_in, d_hidden)),
+            &quot;b1&quot;: np.zeros(d_hidden),
+            &quot;W2&quot;: rng.normal(0, np.sqrt(2.0 / d_hidden), (d_hidden, d_out)),
+            &quot;b2&quot;: np.zeros(d_out),
+        }
+
+    def forward(self, X):
+        p = self.params
+        h_pre = X @ p[&quot;W1&quot;] + p[&quot;b1&quot;]       # (N, H)
+        h = np.maximum(h_pre, 0)            # ReLU
+        logits = h @ p[&quot;W2&quot;] + p[&quot;b2&quot;]      # (N, C)
+        self.cache = (X, h_pre, h)
+        return logits
+
+    def loss_and_grads(self, X, y):
+        logits = self.forward(X)
+        loss = cross_entropy(logits, y)
+        X, h_pre, h = self.cache
+        N = X.shape[0]
+        p = self.params
+
+        dlogits = softmax(logits)
+        dlogits[np.arange(N), y] -= 1
+        dlogits /= N                                  # (N, C)
+
+        grads = {}
+        grads[&quot;W2&quot;] = h.T @ dlogits                   # (H, C)
+        grads[&quot;b2&quot;] = dlogits.sum(0)                  # (C,)
+        dh = dlogits @ p[&quot;W2&quot;].T                      # (N, H)
+        dh_pre = dh * (h_pre &gt; 0)                     # ReLU backward
+        grads[&quot;W1&quot;] = X.T @ dh_pre                    # (D, H)
+        grads[&quot;b1&quot;] = dh_pre.sum(0)
+        return loss, grads
+
+
+def grad_check(model, X, y, eps=1e-5, n_samples=20, seed=0):
+    &quot;&quot;&quot;Centered finite differences on random coordinates. Returns max relative error.&quot;&quot;&quot;
+    rng = np.random.default_rng(seed)
+    _, grads = model.loss_and_grads(X, y)
+    worst = 0.0
+    for name, W in model.params.items():
+        for _ in range(n_samples):
+            idx = tuple(rng.integers(0, s) for s in W.shape)
+            old = W[idx]
+            W[idx] = old + eps
+            lp, _ = model.loss_and_grads(X, y)
+            W[idx] = old - eps
+            lm, _ = model.loss_and_grads(X, y)
+            W[idx] = old
+            num = (lp - lm) / (2 * eps)
+            ana = grads[name][idx]
+            rel = abs(num - ana) / max(1e-8, abs(num) + abs(ana))
+            worst = max(worst, rel)
+    return worst
+
+
+def make_spirals(n=300, k=3, seed=0):
+    rng = np.random.default_rng(seed)
+    X, y = [], []
+    for c in range(k):
+        r = np.linspace(0.0, 1, n)
+        t = np.linspace(c * 4, (c + 1) * 4, n) + rng.normal(0, 0.2, n)
+        X.append(np.c_[r * np.sin(t), r * np.cos(t)])
+        y.append(np.full(n, c))
+    return np.vstack(X), np.concatenate(y)
+
+
+if __name__ == &quot;__main__&quot;:
+    X, y = make_spirals()
+    model = MLP(2, 64, 3)
+    # float64 + a random batch. Avoid points sitting exactly on the ReLU kink (e.g. X=0 with b1=0):
+    # finite differences across the kink disagree with the analytic subgradient.
+    idx = np.random.default_rng(1).choice(len(X), 16, replace=False)
+    idx = idx[np.abs(X[idx]).sum(1) &gt; 1e-3]
+    err = grad_check(model, X[idx], y[idx])
+    print(f&quot;grad check max rel error: {err:.2e}&quot;)
+    assert err &lt; 1e-6
+
+    lr = 1.0
+    for step in range(2000):
+        loss, grads = model.loss_and_grads(X, y)
+        for k in model.params:
+            model.params[k] -= lr * grads[k]
+        if step % 500 == 0:
+            print(f&quot;step {step:4d} loss {loss:.4f}&quot;)
+    acc = (model.forward(X).argmax(1) == y).mean()
+    print(f&quot;final loss {loss:.4f}, train acc {acc:.3f}&quot;)
+    assert acc &gt; 0.9
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c02">
+<div class="codehead"><span>02_norms_numpy.py — LayerNorm / RMSNorm / BatchNorm backward (numpy)</span>
+<span><a href="code/02_norms_numpy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;LayerNorm / RMSNorm / BatchNorm forward + backward in numpy, checked numerically.
+
+Interview checklist:
+- LayerNorm normalises over the feature dim (per token); BatchNorm over the batch dim (per feature)
+- BatchNorm keeps running stats for inference; LayerNorm behaves the same in train and eval
+- LN backward compact form: dx = (1/sigma) * (g - mean(g) - xhat * mean(g * xhat)), g = dy * gamma
+&quot;&quot;&quot;
+import numpy as np
+
+
+def layernorm_forward(x, gamma, beta, eps=1e-5):
+    mu = x.mean(-1, keepdims=True)
+    var = x.var(-1, keepdims=True)
+    inv = 1.0 / np.sqrt(var + eps)
+    xhat = (x - mu) * inv
+    return xhat * gamma + beta, (xhat, inv, gamma)
+
+
+def layernorm_backward(dy, cache):
+    xhat, inv, gamma = cache
+    dgamma = (dy * xhat).reshape(-1, xhat.shape[-1]).sum(0)
+    dbeta = dy.reshape(-1, dy.shape[-1]).sum(0)
+    g = dy * gamma
+    dx = inv * (g - g.mean(-1, keepdims=True) - xhat * (g * xhat).mean(-1, keepdims=True))
+    return dx, dgamma, dbeta
+
+
+def rmsnorm_forward(x, gamma, eps=1e-6):
+    rms = np.sqrt((x * x).mean(-1, keepdims=True) + eps)
+    xhat = x / rms
+    return xhat * gamma, (xhat, rms, gamma)
+
+
+def rmsnorm_backward(dy, cache):
+    xhat, rms, gamma = cache
+    dgamma = (dy * xhat).reshape(-1, xhat.shape[-1]).sum(0)
+    g = dy * gamma
+    dx = (g - xhat * (g * xhat).mean(-1, keepdims=True)) / rms
+    return dx, dgamma
+
+
+class BatchNorm1d:
+    def __init__(self, d, momentum=0.1, eps=1e-5):
+        self.gamma, self.beta = np.ones(d), np.zeros(d)
+        self.running_mean, self.running_var = np.zeros(d), np.ones(d)
+        self.m, self.eps, self.training = momentum, eps, True
+
+    def forward(self, x):                      # x: (N, D)
+        if self.training:
+            mu, var = x.mean(0), x.var(0)
+            n = x.shape[0]
+            self.running_mean = (1 - self.m) * self.running_mean + self.m * mu
+            self.running_var = (1 - self.m) * self.running_var + self.m * var * n / (n - 1)  # unbiased
+        else:
+            mu, var = self.running_mean, self.running_var
+        inv = 1 / np.sqrt(var + self.eps)
+        xhat = (x - mu) * inv
+        self.cache = (xhat, inv)
+        return xhat * self.gamma + self.beta
+
+    def backward(self, dy):
+        xhat, inv = self.cache
+        self.dgamma = (dy * xhat).sum(0)
+        self.dbeta = dy.sum(0)
+        g = dy * self.gamma
+        return inv * (g - g.mean(0) - xhat * (g * xhat).mean(0))
+
+
+def numgrad(f, x, eps=1e-6):
+    g = np.zeros_like(x)
+    it = np.nditer(x, flags=[&quot;multi_index&quot;])
+    for _ in it:
+        i = it.multi_index
+        old = x[i]
+        x[i] = old + eps; fp = f()
+        x[i] = old - eps; fm = f()
+        x[i] = old
+        g[i] = (fp - fm) / (2 * eps)
+    return g
+
+
+if __name__ == &quot;__main__&quot;:
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(4, 5, 8))
+    gamma, beta = rng.normal(size=8), rng.normal(size=8)
+    dy = rng.normal(size=x.shape)
+
+    y, cache = layernorm_forward(x, gamma, beta)
+    dx, dg, db = layernorm_backward(dy, cache)
+    f = lambda: (layernorm_forward(x, gamma, beta)[0] * dy).sum()
+    for name, a, n in [(&quot;dx&quot;, dx, numgrad(f, x)), (&quot;dgamma&quot;, dg, numgrad(f, gamma)), (&quot;dbeta&quot;, db, numgrad(f, beta))]:
+        print(f&quot;LayerNorm {name}: max abs err {np.abs(a - n).max():.2e}&quot;)
+        assert np.allclose(a, n, atol=1e-6)
+
+    y, cache = rmsnorm_forward(x, gamma)
+    dx, dg = rmsnorm_backward(dy, cache)
+    f = lambda: (rmsnorm_forward(x, gamma)[0] * dy).sum()
+    assert np.allclose(dx, numgrad(f, x), atol=1e-6) and np.allclose(dg, numgrad(f, gamma), atol=1e-6)
+    print(&quot;RMSNorm grads OK&quot;)
+
+    bn = BatchNorm1d(8)
+    xb, dyb = rng.normal(size=(16, 8)), rng.normal(size=(16, 8))
+    bn.forward(xb); dx = bn.backward(dyb)
+    f = lambda: (BatchNorm1d(8).forward(xb) * dyb).sum()
+    assert np.allclose(dx, numgrad(f, xb), atol=1e-6)
+    print(&quot;BatchNorm grads OK&quot;)
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c03">
+<div class="codehead"><span>03_attention_numpy.py — Multi-head attention + masks (numpy)</span>
+<span><a href="code/03_attention_numpy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;Scaled dot-product + multi-head attention in numpy (causal + padding masks), checked against torch.
+
+Interview checklist:
+- scores = Q K^T / sqrt(d_head); mask BEFORE softmax with -inf (or a large negative number)
+- causal mask: position i may attend to j &lt;= i  -&gt; np.triu(ones, k=1) are the masked entries
+- shapes: x (B, T, D) -&gt; q,k,v (B, H, T, Dh) with Dh = D // H
+- complexity O(B * H * T^2 * Dh) time, O(B * H * T^2) memory for the score matrix
+&quot;&quot;&quot;
+import numpy as np
+
+
+def softmax(z, axis=-1):
+    z = z - z.max(axis=axis, keepdims=True)
+    e = np.exp(z)
+    return e / e.sum(axis=axis, keepdims=True)
+
+
+def scaled_dot_product_attention(q, k, v, mask=None):
+    &quot;&quot;&quot;q (..., Tq, d), k (..., Tk, d), v (..., Tk, dv); mask broadcastable to (..., Tq, Tk), True = keep.&quot;&quot;&quot;
+    d = q.shape[-1]
+    scores = q @ np.swapaxes(k, -1, -2) / np.sqrt(d)
+    if mask is not None:
+        scores = np.where(mask, scores, -1e30)
+    attn = softmax(scores, -1)
+    return attn @ v, attn
+
+
+def causal_mask(T):
+    return np.tril(np.ones((T, T), dtype=bool))      # (T, T), True = allowed
+
+
+def padding_mask(lengths, T):
+    &quot;&quot;&quot;lengths (B,) -&gt; (B, 1, 1, T) mask over keys.&quot;&quot;&quot;
+    return (np.arange(T)[None, :] &lt; np.asarray(lengths)[:, None])[:, None, None, :]
+
+
+class MultiHeadAttention:
+    def __init__(self, d_model, n_heads, seed=0):
+        assert d_model % n_heads == 0
+        rng = np.random.default_rng(seed)
+        s = 1 / np.sqrt(d_model)
+        self.Wq, self.Wk, self.Wv, self.Wo = (rng.normal(0, s, (d_model, d_model)) for _ in range(4))
+        self.h, self.dh = n_heads, d_model // n_heads
+
+    def split(self, x):          # (B, T, D) -&gt; (B, H, T, Dh)
+        B, T, _ = x.shape
+        return x.reshape(B, T, self.h, self.dh).transpose(0, 2, 1, 3)
+
+    def merge(self, x):          # (B, H, T, Dh) -&gt; (B, T, D)
+        B, H, T, Dh = x.shape
+        return x.transpose(0, 2, 1, 3).reshape(B, T, H * Dh)
+
+    def __call__(self, x, mask=None):
+        q, k, v = self.split(x @ self.Wq), self.split(x @ self.Wk), self.split(x @ self.Wv)
+        out, attn = scaled_dot_product_attention(q, k, v, mask)
+        return self.merge(out) @ self.Wo, attn
+
+
+if __name__ == &quot;__main__&quot;:
+    rng = np.random.default_rng(0)
+    B, T, D, H = 2, 6, 16, 4
+    x = rng.normal(size=(B, T, D))
+    mha = MultiHeadAttention(D, H)
+    mask = causal_mask(T)[None, None] &amp; padding_mask([6, 4], T)
+    out, attn = mha(x, mask)
+    print(&quot;out&quot;, out.shape, &quot;attn&quot;, attn.shape)
+
+    # sanity: causal -&gt; upper triangle of attention is zero; rows sum to 1
+    assert np.allclose(np.triu(attn[0, 0], 1), 0)
+    assert np.allclose(attn.sum(-1), 1)
+    # sanity: padded keys (positions 4,5 of batch 1) get zero weight
+    assert np.allclose(attn[1, :, :, 4:], 0)
+
+    try:
+        import torch
+        import torch.nn.functional as F
+        t = lambda a: torch.tensor(a, dtype=torch.float64)
+        q, k, v = (t(mha.split(x @ W)) for W in (mha.Wq, mha.Wk, mha.Wv))
+        ref = F.scaled_dot_product_attention(q, k, v, attn_mask=torch.tensor(mask))
+        ref = t(mha.merge(ref.numpy())) @ t(mha.Wo)
+        # rows that are fully valid should match exactly
+        print(&quot;max diff vs torch:&quot;, (ref - t(out)).abs().max().item())
+        assert torch.allclose(ref, t(out), atol=1e-8)
+    except ImportError:
+        print(&quot;torch not installed, skipped reference check&quot;)
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c04">
+<div class="codehead"><span>04_gpt_torch.py — Mini GPT: RoPE, KV cache, sampling, AdamW, warmup/cosine (torch)</span>
+<span><a href="code/04_gpt_torch.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;Minimal GPT in PyTorch: RoPE, RMSNorm, causal MHA with KV cache, SwiGLU MLP, AdamW + warmup/cosine,
+grad clipping, grad accumulation, and sampling (temperature / top-k / top-p).
+
+Trains a char-level model on a tiny repeated text and checks:
+  1) loss goes down
+  2) KV-cache generation == full-recompute generation (greedy)
+
+Interview checklist:
+- pre-norm residual: x = x + attn(norm(x)); x = x + mlp(norm(x))
+- weight tying between token embedding and lm_head
+- AdamW: decoupled weight decay; common choice: decay only &gt;=2D weights (matmuls, embeddings), not norms/biases
+- KV cache: per layer store k,v of shape (B, H, T_past, Dh); new token attends to all of them; no mask needed for 1 query
+- per-token cost with cache: O(T * D) attention instead of O(T^2 * D)
+&quot;&quot;&quot;
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+torch.manual_seed(0)
+
+
+class RMSNorm(nn.Module):
+    def __init__(self, d, eps=1e-6):
+        super().__init__()
+        self.w, self.eps = nn.Parameter(torch.ones(d)), eps
+
+    def forward(self, x):
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.w
+
+
+def rope_cache(T, dh, base=10000.0):
+    inv = 1.0 / base ** (torch.arange(0, dh, 2).float() / dh)       # (dh/2,)
+    ang = torch.outer(torch.arange(T).float(), inv)                  # (T, dh/2)
+    return ang.cos(), ang.sin()
+
+
+def apply_rope(x, cos, sin):
+    &quot;&quot;&quot;x (B, H, T, dh); rotate pairs (x0,x1),(x2,x3),...&quot;&quot;&quot;
+    x1, x2 = x[..., 0::2], x[..., 1::2]
+    out = torch.stack([x1 * cos - x2 * sin, x1 * sin + x2 * cos], dim=-1)
+    return out.flatten(-2)
+
+
+class Attention(nn.Module):
+    def __init__(self, d, h):
+        super().__init__()
+        self.h, self.dh = h, d // h
+        self.qkv = nn.Linear(d, 3 * d, bias=False)
+        self.o = nn.Linear(d, d, bias=False)
+
+    def forward(self, x, cos, sin, cache=None):
+        B, T, D = x.shape
+        q, k, v = self.qkv(x).view(B, T, 3, self.h, self.dh).permute(2, 0, 3, 1, 4)  # each (B,H,T,dh)
+        q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
+        if cache is not None:
+            if &quot;k&quot; in cache:
+                k = torch.cat([cache[&quot;k&quot;], k], dim=2)
+                v = torch.cat([cache[&quot;v&quot;], v], dim=2)
+            cache[&quot;k&quot;], cache[&quot;v&quot;] = k, v
+        Tk = k.shape[2]
+        # causal mask that also works when T &lt; Tk (decoding with cache)
+        mask = torch.ones(T, Tk, dtype=torch.bool, device=x.device).tril(diagonal=Tk - T)
+        att = (q @ k.transpose(-1, -2)) / math.sqrt(self.dh)
+        att = att.masked_fill(~mask, float(&quot;-inf&quot;)).softmax(-1)
+        y = (att @ v).transpose(1, 2).reshape(B, T, D)
+        return self.o(y)
+
+
+class SwiGLU(nn.Module):
+    def __init__(self, d, hidden):
+        super().__init__()
+        self.w1, self.w3 = nn.Linear(d, hidden, bias=False), nn.Linear(d, hidden, bias=False)
+        self.w2 = nn.Linear(hidden, d, bias=False)
+
+    def forward(self, x):
+        return self.w2(F.silu(self.w1(x)) * self.w3(x))
+
+
+class Block(nn.Module):
+    def __init__(self, d, h):
+        super().__init__()
+        self.n1, self.attn = RMSNorm(d), Attention(d, h)
+        self.n2, self.mlp = RMSNorm(d), SwiGLU(d, 4 * d)
+
+    def forward(self, x, cos, sin, cache=None):
+        x = x + self.attn(self.n1(x), cos, sin, cache)
+        return x + self.mlp(self.n2(x))
+
+
+class GPT(nn.Module):
+    def __init__(self, vocab, d=64, h=4, L=2, max_T=256):
+        super().__init__()
+        self.emb = nn.Embedding(vocab, d)
+        self.blocks = nn.ModuleList(Block(d, h) for _ in range(L))
+        self.norm = RMSNorm(d)
+        self.head = nn.Linear(d, vocab, bias=False)
+        self.head.weight = self.emb.weight                     # weight tying
+        cos, sin = rope_cache(max_T, d // h)
+        self.register_buffer(&quot;cos&quot;, cos, persistent=False)
+        self.register_buffer(&quot;sin&quot;, sin, persistent=False)
+
+    def forward(self, idx, caches=None, pos=0):
+        T = idx.shape[1]
+        cos, sin = self.cos[pos:pos + T], self.sin[pos:pos + T]
+        x = self.emb(idx)
+        for i, b in enumerate(self.blocks):
+            x = b(x, cos, sin, None if caches is None else caches[i])
+        return self.head(self.norm(x))
+
+
+def sample_next(logits, temperature=1.0, top_k=None, top_p=None):
+    &quot;&quot;&quot;logits (B, V) -&gt; (B, 1).&quot;&quot;&quot;
+    if temperature == 0:
+        return logits.argmax(-1, keepdim=True)
+    logits = logits / temperature
+    if top_k is not None:
+        kth = torch.topk(logits, top_k, dim=-1).values[..., -1:]
+        logits = logits.masked_fill(logits &lt; kth, float(&quot;-inf&quot;))
+    if top_p is not None:
+        sorted_logits, sorted_idx = logits.sort(-1, descending=True)
+        probs = sorted_logits.softmax(-1)
+        cum = probs.cumsum(-1)
+        remove = cum - probs &gt; top_p                     # keep the smallest prefix with mass &gt;= top_p
+        sorted_logits = sorted_logits.masked_fill(remove, float(&quot;-inf&quot;))
+        logits = torch.full_like(logits, float(&quot;-inf&quot;)).scatter(-1, sorted_idx, sorted_logits)
+    return torch.multinomial(logits.softmax(-1), 1)
+
+
+@torch.no_grad()
+def generate_naive(model, idx, n, **kw):
+    for _ in range(n):
+        logits = model(idx)[:, -1]
+        idx = torch.cat([idx, sample_next(logits, **kw)], 1)
+    return idx
+
+
+@torch.no_grad()
+def generate_kv(model, idx, n, **kw):
+    caches = [{} for _ in model.blocks]
+    logits = model(idx, caches, pos=0)[:, -1]            # prefill
+    out = idx
+    for _ in range(n):
+        nxt = sample_next(logits, **kw)
+        out = torch.cat([out, nxt], 1)
+        logits = model(nxt, caches, pos=out.shape[1] - 1)[:, -1]   # decode one token
+    return out
+
+
+def lr_at(step, max_lr, warmup, total, min_lr_ratio=0.1):
+    if step &lt; warmup:
+        return max_lr * (step + 1) / warmup
+    p = (step - warmup) / max(1, total - warmup)
+    return max_lr * (min_lr_ratio + (1 - min_lr_ratio) * 0.5 * (1 + math.cos(math.pi * p)))
+
+
+def configure_adamw(model, lr, wd=0.1):
+    decay = [p for n, p in model.named_parameters() if p.dim() &gt;= 2]
+    no_decay = [p for n, p in model.named_parameters() if p.dim() &lt; 2]
+    return torch.optim.AdamW([{&quot;params&quot;: decay, &quot;weight_decay&quot;: wd},
+                              {&quot;params&quot;: no_decay, &quot;weight_decay&quot;: 0.0}], lr=lr, betas=(0.9, 0.95))
+
+
+if __name__ == &quot;__main__&quot;:
+    text = &quot;the quick brown fox jumps over the lazy dog. &quot; * 50
+    chars = sorted(set(text))
+    stoi = {c: i for i, c in enumerate(chars)}
+    data = torch.tensor([stoi[c] for c in text])
+    model = GPT(len(chars))
+    opt = configure_adamw(model, 3e-3)
+
+    T, B, steps, accum = 32, 16, 300, 2
+    first = None
+    for step in range(steps):
+        for g in opt.param_groups:
+            g[&quot;lr&quot;] = lr_at(step, 3e-3, 30, steps)
+        opt.zero_grad(set_to_none=True)
+        for _ in range(accum):                                   # gradient accumulation
+            ix = torch.randint(0, len(data) - T - 1, (B,))
+            x = torch.stack([data[i:i + T] for i in ix])
+            y = torch.stack([data[i + 1:i + T + 1] for i in ix])
+            loss = F.cross_entropy(model(x).flatten(0, 1), y.flatten()) / accum
+            loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        opt.step()
+        if first is None:
+            first = loss.item() * accum
+        if step % 100 == 0:
+            print(f&quot;step {step} loss {loss.item() * accum:.3f}&quot;)
+    final = loss.item() * accum
+    print(f&quot;loss {first:.3f} -&gt; {final:.3f}&quot;)
+    assert final &lt; first * 0.3
+
+    model.eval()
+    prompt = torch.tensor([[stoi[c] for c in &quot;the quick &quot;]])
+    a = generate_naive(model, prompt, 30, temperature=0)
+    b = generate_kv(model, prompt, 30, temperature=0)
+    decode = lambda t: &quot;&quot;.join(chars[i] for i in t[0].tolist())
+    print(&quot;naive:&quot;, repr(decode(a)))
+    print(&quot;kv   :&quot;, repr(decode(b)))
+    assert torch.equal(a, b)
+    torch.manual_seed(1)
+    print(&quot;top-p:&quot;, repr(decode(generate_kv(model, prompt, 30, temperature=0.8, top_k=10, top_p=0.9))))
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c05">
+<div class="codehead"><span>05_optimizers_numpy.py — SGD / Adam / AdamW from scratch (numpy, vs torch)</span>
+<span><a href="code/05_optimizers_numpy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;SGD+momentum, Adam, AdamW from scratch; checked against torch.optim on the same problem.
+
+Interview checklist:
+- Adam: m = b1 m + (1-b1) g ; v = b2 v + (1-b2) g^2 ; bias-correct mhat = m/(1-b1^t), vhat = v/(1-b2^t)
+- update: p -= lr * mhat / (sqrt(vhat) + eps)
+- L2 in Adam (add wd*p to g) != AdamW (p -= lr*wd*p separately): with Adam the decay gets rescaled by 1/sqrt(v)
+- torch SGD momentum: buf = mu*buf + g ; p -= lr*buf (no dampening by default)
+&quot;&quot;&quot;
+import numpy as np
+
+
+class SGD:
+    def __init__(self, params, lr, momentum=0.0, weight_decay=0.0):
+        self.p, self.lr, self.mu, self.wd = params, lr, momentum, weight_decay
+        self.buf = [np.zeros_like(x) for x in params]
+
+    def step(self, grads):
+        for p, g, b in zip(self.p, grads, self.buf):
+            g = g + self.wd * p
+            b *= self.mu
+            b += g
+            p -= self.lr * b
+
+
+class Adam:
+    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, decoupled=False):
+        self.p, self.lr, (self.b1, self.b2), self.eps = params, lr, betas, eps
+        self.wd, self.decoupled, self.t = weight_decay, decoupled, 0
+        self.m = [np.zeros_like(x) for x in params]
+        self.v = [np.zeros_like(x) for x in params]
+
+    def step(self, grads):
+        self.t += 1
+        for p, g, m, v in zip(self.p, grads, self.m, self.v):
+            if self.decoupled:
+                p -= self.lr * self.wd * p            # AdamW
+            else:
+                g = g + self.wd * p                   # L2 (Adam)
+            m[:] = self.b1 * m + (1 - self.b1) * g
+            v[:] = self.b2 * v + (1 - self.b2) * g * g
+            mhat = m / (1 - self.b1 ** self.t)
+            vhat = v / (1 - self.b2 ** self.t)
+            p -= self.lr * mhat / (np.sqrt(vhat) + self.eps)
+
+
+def AdamW(params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2):
+    return Adam(params, lr, betas, eps, weight_decay, decoupled=True)
+
+
+def quad_grad(w, A, b):
+    &quot;&quot;&quot;loss = 0.5 w^T A w - b^T w -&gt; grad = A w - b&quot;&quot;&quot;
+    return A @ w - b
+
+
+if __name__ == &quot;__main__&quot;:
+    rng = np.random.default_rng(0)
+    M = rng.normal(size=(5, 5)); A = M @ M.T + np.eye(5); b = rng.normal(size=5)
+    w0 = rng.normal(size=5)
+
+    import torch
+    configs = [
+        (&quot;SGD+mom&quot;, lambda p: SGD(p, 0.01, momentum=0.9, weight_decay=0.01),
+         lambda p: torch.optim.SGD(p, 0.01, momentum=0.9, weight_decay=0.01)),
+        (&quot;Adam+L2&quot;, lambda p: Adam(p, 0.05, weight_decay=0.1),
+         lambda p: torch.optim.Adam(p, 0.05, weight_decay=0.1)),
+        (&quot;AdamW&quot;, lambda p: AdamW(p, 0.05, weight_decay=0.1),
+         lambda p: torch.optim.AdamW(p, 0.05, weight_decay=0.1)),
+    ]
+    for name, mine, ref in configs:
+        w = w0.copy(); opt = mine([w])
+        wt = torch.tensor(w0, requires_grad=True); topt = ref([wt])
+        At, bt = torch.tensor(A), torch.tensor(b)
+        for _ in range(200):
+            opt.step([quad_grad(w, A, b)])
+            topt.zero_grad(); (0.5 * wt @ At @ wt - bt @ wt).backward(); topt.step()
+        diff = np.abs(w - wt.detach().numpy()).max()
+        print(f&quot;{name:8s} max diff vs torch {diff:.2e}&quot;)
+        assert diff &lt; 1e-8
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c06">
+<div class="codehead"><span>06_debug_training.py — Debug drill: buggy vs fixed training loop (torch)</span>
+<span><a href="code/06_debug_training.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;Debug drill: a buggy training loop with 6 planted bugs, followed by the fixed version.
+
+Try first: read `buggy_train` and list every bug before scrolling to `fixed_train`.
+Planted bugs:
+  1. optimizer.zero_grad() missing  -&gt; gradients accumulate across steps
+  2. softmax applied before F.cross_entropy (which already does log_softmax) -&gt; double softmax, weak grads
+  3. labels flattened in a different order than logits (yb.t().reshape(-1)) -&gt; silent misalignment
+  4. causal mask inverted (masks the past instead of the future) -&gt; model can cheat / or can&#x27;t learn
+  5. model.eval() / torch.no_grad() missing in evaluation (dropout active during eval)
+  6. data never shuffled + learning rate 10x too high
+Common real-world extras to mention: NaN from log(0), wrong dtype for labels (float vs long),
+forgetting .detach() when logging (memory leak), loss averaged twice, train/eval data leakage.
+&quot;&quot;&quot;
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+torch.manual_seed(0)
+
+
+def make_data(n=2000, T=8, V=10):
+    # task: predict the previous token (copy shifted by 1) -&gt; needs attention to the past only
+    x = torch.randint(1, V, (n, T))
+    y = torch.cat([torch.zeros(n, 1, dtype=torch.long), x[:, :-1]], 1)
+    return x, y
+
+
+class TinyAttnModel(nn.Module):
+    def __init__(self, V=10, d=32, T=8, invert_mask=False):
+        super().__init__()
+        self.emb, self.pos = nn.Embedding(V, d), nn.Embedding(T, d)
+        self.qkv, self.out = nn.Linear(d, 3 * d), nn.Linear(d, V)
+        self.drop = nn.Dropout(0.3)
+        self.invert = invert_mask
+
+    def forward(self, x):
+        B, T = x.shape
+        h = self.emb(x) + self.pos(torch.arange(T))
+        q, k, v = self.qkv(h).chunk(3, -1)
+        att = q @ k.transpose(-1, -2) / q.shape[-1] ** 0.5
+        mask = torch.ones(T, T, dtype=torch.bool).tril()
+        if self.invert:
+            mask = ~mask                                     # BUG 4
+        att = att.masked_fill(~mask, -1e9).softmax(-1)
+        return self.out(self.drop(att @ v) + h)
+
+
+def accuracy(model, x, y, fixed):
+    if fixed:
+        model.eval()
+        with torch.no_grad():
+            pred = model(x).argmax(-1)                       # (B, T)
+        model.train()
+    else:
+        pred = model(x).argmax(-1)                           # BUG 5: no model.eval() / no_grad (dropout on)
+    return (pred == y).float().mean().item()
+
+
+def buggy_train(steps=300):
+    x, y = make_data()
+    model = TinyAttnModel(invert_mask=True)
+    opt = torch.optim.Adam(model.parameters(), lr=1e-1)      # BUG 6a: lr too high
+    for step in range(steps):
+        i = (step * 64) % 1900
+        xb, yb = x[i:i + 64], y[i:i + 64]                    # BUG 6b: no shuffle (fine here, bad in general)
+        logits = model(xb).softmax(-1)                       # BUG 2
+        loss = F.cross_entropy(logits.view(-1, 10), yb.t().reshape(-1))   # BUG 3
+        loss.backward()                                      # BUG 1: no zero_grad
+        opt.step()
+    return accuracy(model, x, y, fixed=False)
+
+
+def fixed_train(steps=300):
+    x, y = make_data()
+    model = TinyAttnModel(invert_mask=False)
+    opt = torch.optim.Adam(model.parameters(), lr=3e-3)
+    for step in range(steps):
+        idx = torch.randint(0, len(x), (64,))
+        xb, yb = x[idx], y[idx]
+        logits = model(xb)
+        loss = F.cross_entropy(logits.reshape(-1, 10), yb.reshape(-1))
+        opt.zero_grad(set_to_none=True)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        opt.step()
+    return accuracy(model, x, y, fixed=True)
+
+
+if __name__ == &quot;__main__&quot;:
+    b = buggy_train()
+    f = fixed_train()
+    print(f&quot;buggy acc {b:.3f}   fixed acc {f:.3f}&quot;)
+    assert f &gt; 0.95 and f &gt; b
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c07">
+<div class="codehead"><span>07_classic_ml_numpy.py — Classic ML: logreg, k-means, PCA, kNN, conv2d im2col (numpy)</span>
+<span><a href="code/07_classic_ml_numpy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;Classic ML from scratch: logistic regression (GD), k-means (k-means++ init), PCA via SVD, kNN, conv2d (im2col).
+
+Interview checklist:
+- logistic regression grad: X^T (sigmoid(Xw) - y) / N ; use a stable sigmoid / logaddexp for the loss
+- k-means: alternate assign / update; handle empty clusters; k-means++ init; objective is non-increasing
+- PCA: center X, SVD X = U S V^T, components = V[:k], explained variance = S^2 / (N-1)
+- conv2d via im2col: (N,C,H,W) -&gt; patches (N*Ho*Wo, C*kh*kw) @ W.reshape(F, -1).T
+&quot;&quot;&quot;
+import numpy as np
+
+
+def sigmoid(z):
+    return np.where(z &gt;= 0, 1 / (1 + np.exp(-np.abs(z))), np.exp(-np.abs(z)) / (1 + np.exp(-np.abs(z))))
+
+
+def logreg_fit(X, y, lr=0.5, steps=1000, l2=0.0):
+    Xb = np.c_[X, np.ones(len(X))]
+    w = np.zeros(Xb.shape[1])
+    for _ in range(steps):
+        z = Xb @ w
+        grad = Xb.T @ (sigmoid(z) - y) / len(y) + l2 * np.r_[w[:-1], 0]
+        w -= lr * grad
+    loss = np.mean(np.logaddexp(0, z) - y * z)          # stable BCE
+    return w, loss
+
+
+def kmeans_single(X, k, iters=100, seed=0):
+    rng = np.random.default_rng(seed)
+    C = [X[rng.integers(len(X))]]
+    for _ in range(1, k):                                 # k-means++
+        d2 = np.min(((X[:, None] - np.array(C)[None]) ** 2).sum(-1), 1)
+        C.append(X[rng.choice(len(X), p=d2 / d2.sum())])
+    C = np.array(C)
+    prev = np.inf
+    for _ in range(iters):
+        d2 = ((X[:, None] - C[None]) ** 2).sum(-1)       # (N, k)
+        a = d2.argmin(1)
+        obj = d2[np.arange(len(X)), a].sum()
+        assert obj &lt;= prev + 1e-9
+        for j in range(k):
+            C[j] = X[a == j].mean(0) if np.any(a == j) else X[rng.integers(len(X))]
+        if prev - obj &lt; 1e-10:
+            break
+        prev = obj
+    return C, a, obj
+
+
+def kmeans(X, k, n_init=5, seed=0):
+    &quot;&quot;&quot;k-means only finds a local optimum -&gt; run several inits and keep the lowest objective.&quot;&quot;&quot;
+    return min((kmeans_single(X, k, seed=seed + i) for i in range(n_init)), key=lambda r: r[2])
+
+
+def pca(X, k):
+    mu = X.mean(0)
+    U, S, Vt = np.linalg.svd(X - mu, full_matrices=False)
+    comps = Vt[:k]
+    var = S ** 2 / (len(X) - 1)
+    return comps, (X - mu) @ comps.T, var[:k] / var.sum()
+
+
+def knn_predict(Xtr, ytr, Xte, k=5):
+    # ||a-b||^2 = |a|^2 + |b|^2 - 2ab, vectorised
+    d2 = (Xte ** 2).sum(1)[:, None] + (Xtr ** 2).sum(1)[None] - 2 * Xte @ Xtr.T
+    nn_idx = np.argpartition(d2, k, axis=1)[:, :k]
+    votes = ytr[nn_idx]
+    return np.array([np.bincount(v).argmax() for v in votes])
+
+
+def conv2d_im2col(x, W, b, stride=1, pad=0):
+    N, C, H, Wd = x.shape
+    F, _, kh, kw = W.shape
+    x = np.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)))
+    Ho, Wo = (H + 2 * pad - kh) // stride + 1, (Wd + 2 * pad - kw) // stride + 1
+    cols = np.empty((N, Ho, Wo, C, kh, kw))
+    for i in range(kh):
+        for j in range(kw):
+            cols[:, :, :, :, i, j] = x[:, :, i:i + stride * Ho:stride, j:j + stride * Wo:stride].transpose(0, 2, 3, 1)
+    out = cols.reshape(N * Ho * Wo, -1) @ W.reshape(F, -1).T + b
+    return out.reshape(N, Ho, Wo, F).transpose(0, 3, 1, 2)
+
+
+if __name__ == &quot;__main__&quot;:
+    rng = np.random.default_rng(0)
+    X = np.r_[rng.normal(-2, 1, (200, 2)), rng.normal(2, 1, (200, 2))]
+    y = np.r_[np.zeros(200), np.ones(200)]
+    w, loss = logreg_fit(X, y)
+    acc = ((np.c_[X, np.ones(400)] @ w &gt; 0) == y).mean()
+    print(f&quot;logreg loss {loss:.3f} acc {acc:.3f}&quot;); assert acc &gt; 0.95
+
+    blobs = np.r_[rng.normal(0, .3, (100, 2)), rng.normal(3, .3, (100, 2)), rng.normal([0, 3], .3, (100, 2))]
+    C, a, obj = kmeans(blobs, 3)
+    C = C[np.argsort(C[:, 0] + 10 * C[:, 1])]
+    print(&quot;kmeans centers\n&quot;, np.round(C, 2)); assert np.allclose(C, [[0, 0], [0, 3], [3, 3]], atol=0.15)
+
+    Z = rng.normal(size=(500, 2)) @ np.array([[3, 0, 0], [0, 1, 0]]) + 0.01 * rng.normal(size=(500, 3))
+    comps, proj, ratio = pca(Z, 2)
+    print(&quot;pca explained ratio&quot;, np.round(ratio, 3)); assert ratio.sum() &gt; 0.99
+
+    pred = knn_predict(X, y.astype(int), X[::10])
+    print(&quot;knn acc&quot;, (pred == y[::10]).mean())
+
+    import torch
+    x = rng.normal(size=(2, 3, 7, 7)); Wc = rng.normal(size=(4, 3, 3, 3)); bc = rng.normal(size=4)
+    ref = torch.nn.functional.conv2d(torch.tensor(x), torch.tensor(Wc), torch.tensor(bc), stride=2, padding=1).numpy()
+    out = conv2d_im2col(x, Wc, bc, stride=2, pad=1)
+    print(&quot;conv2d max diff vs torch&quot;, np.abs(out - ref).max()); assert np.allclose(out, ref)
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c08">
+<div class="codehead"><span>08_rl_losses_torch.py — RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)</span>
+<span><a href="code/08_rl_losses_torch.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;RL for LLM agents: REINFORCE with baseline, GAE, PPO clipped loss, GRPO group advantage, k3 KL estimator.
+Plus a runnable sanity check: REINFORCE learns a 5-armed bandit.
+
+Interview checklist:
+- policy gradient: grad E[R] = E[grad log pi(a|s) * A]; baseline reduces variance, keeps it unbiased
+- GAE: delta_t = r_t + gamma V(s_{t+1}) (1-done) - V(s_t); A_t = delta_t + gamma*lam*(1-done) A_{t+1}
+- PPO: ratio = exp(logp_new - logp_old); L = -min(ratio*A, clip(ratio, 1-eps, 1+eps)*A)
+- GRPO: sample G responses per prompt; A_i = (r_i - mean(r)) / (std(r) + eps); no value net
+- token-level masking: only response tokens count; average over valid tokens (be explicit about seq vs token mean)
+- KL to reference: k3 = exp(ref - logp) - (ref - logp) - 1  (unbiased, always &gt;= 0)
+&quot;&quot;&quot;
+import torch
+
+
+def reinforce_loss(logp, returns, baseline=None):
+    adv = returns - (returns.mean() if baseline is None else baseline)
+    return -(logp * adv.detach()).mean()
+
+
+def gae(rewards, values, dones, gamma=0.99, lam=0.95):
+    &quot;&quot;&quot;rewards, dones: (T,), values: (T+1,) incl. bootstrap value. Returns advantages (T,), returns (T,).&quot;&quot;&quot;
+    T = rewards.shape[0]
+    adv = torch.zeros(T)
+    last = 0.0
+    for t in reversed(range(T)):
+        nonterm = 1.0 - dones[t]
+        delta = rewards[t] + gamma * values[t + 1] * nonterm - values[t]
+        last = delta + gamma * lam * nonterm * last
+        adv[t] = last
+    return adv, adv + values[:-1]
+
+
+def ppo_loss(logp_new, logp_old, adv, mask, clip_eps=0.2):
+    &quot;&quot;&quot;all (B, T); mask = 1 for response tokens.&quot;&quot;&quot;
+    ratio = torch.exp(logp_new - logp_old)
+    unclipped = ratio * adv
+    clipped = ratio.clamp(1 - clip_eps, 1 + clip_eps) * adv
+    per_tok = -torch.min(unclipped, clipped)
+    return (per_tok * mask).sum() / mask.sum()
+
+
+def grpo_advantages(rewards, group_size, eps=1e-6):
+    &quot;&quot;&quot;rewards (B*G,) ordered by prompt -&gt; advantages (B*G,).&quot;&quot;&quot;
+    r = rewards.view(-1, group_size)
+    return ((r - r.mean(1, keepdim=True)) / (r.std(1, keepdim=True) + eps)).view(-1)
+
+
+def k3_kl(logp, logp_ref):
+    d = logp_ref - logp
+    return torch.exp(d) - d - 1
+
+
+def token_logprobs(logits, tokens):
+    &quot;&quot;&quot;logits (B, T, V), tokens (B, T) -&gt; log pi(token) (B, T)&quot;&quot;&quot;
+    return torch.log_softmax(logits, -1).gather(-1, tokens.unsqueeze(-1)).squeeze(-1)
+
+
+if __name__ == &quot;__main__&quot;:
+    torch.manual_seed(0)
+    # --- REINFORCE on a bandit ---
+    true_means = torch.tensor([0.1, 0.2, 0.9, 0.3, 0.0])
+    logits = torch.zeros(5, requires_grad=True)
+    opt = torch.optim.Adam([logits], lr=0.05)
+    for _ in range(500):
+        dist = torch.distributions.Categorical(logits=logits)
+        a = dist.sample((64,))
+        r = true_means[a] + 0.1 * torch.randn(64)
+        loss = reinforce_loss(dist.log_prob(a), r)
+        opt.zero_grad(); loss.backward(); opt.step()
+    p = logits.softmax(0)
+    print(&quot;bandit policy&quot;, p.detach().numpy().round(3)); assert p.argmax() == 2 and p[2] &gt; 0.9
+
+    # --- GAE sanity: lam=1, gamma=1, V=0 -&gt; advantage = reward-to-go ---
+    r = torch.tensor([1.0, 0.0, 2.0]); v = torch.zeros(4); d = torch.tensor([0.0, 0.0, 1.0])
+    adv, ret = gae(r, v, d, gamma=1.0, lam=1.0)
+    print(&quot;GAE&quot;, adv.tolist()); assert torch.allclose(adv, torch.tensor([3.0, 2.0, 2.0]))
+
+    # --- PPO: ratio = 1 -&gt; loss = -mean(adv) ; clipping kicks in for large ratio ---
+    lp = torch.zeros(2, 3); A = torch.tensor([[1.0, -1.0, 2.0], [0.5, 0.5, 0.0]]); m = torch.ones(2, 3)
+    assert torch.isclose(ppo_loss(lp, lp, A, m), -(A.mean()))
+    big = torch.full((2, 3), 1.0)  # ratio = e
+    print(&quot;PPO clipped loss&quot;, ppo_loss(big, lp, A, m).item())
+
+    # --- GRPO ---
+    adv = grpo_advantages(torch.tensor([1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0]), 4)
+    print(&quot;GRPO adv&quot;, adv.numpy().round(3)); assert torch.allclose(adv.view(2, 4).mean(1), torch.zeros(2), atol=1e-6)
+
+    # --- k3 KL is &gt;= 0 and ~ true KL on average ---
+    q = torch.distributions.Categorical(logits=torch.randn(10)); pr = torch.distributions.Categorical(logits=torch.randn(10))
+    s = q.sample((200000,))
+    est = k3_kl(q.log_prob(s), pr.log_prob(s)).mean()
+    true = torch.distributions.kl_divergence(q, pr)
+    print(f&quot;k3 KL est {est:.4f} true {true:.4f}&quot;); assert abs(est - true) &lt; 0.02
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c09">
+<div class="codehead"><span>09_sysdesign_snippets.py — System-design snippets: worker pool, UCB, bootstrap, cache, halving</span>
+<span><a href="code/09_sysdesign_snippets.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;Small coding pieces that tend to show up inside a system design round.
+
+1. Async worker pool with timeout + retry + exponential backoff (rollout / eval runner)
+2. UCB1 bandit for allocating budget across candidate ideas
+3. Paired bootstrap / significance test: is candidate B really better than A?
+4. Content-hash cache + dedup for experiment results
+5. Successive halving (budgeted search over candidates)
+&quot;&quot;&quot;
+import asyncio
+import hashlib
+import json
+import math
+import random
+
+
+# ---------- 1. worker pool ----------
+async def run_with_retry(fn, item, timeout, retries=3, base_delay=0.05):
+    for attempt in range(retries + 1):
+        try:
+            return {&quot;item&quot;: item, &quot;ok&quot;: True, &quot;result&quot;: await asyncio.wait_for(fn(item), timeout)}
+        except Exception as e:  # noqa: BLE001  (TimeoutError included)
+            if attempt == retries:
+                return {&quot;item&quot;: item, &quot;ok&quot;: False, &quot;error&quot;: type(e).__name__}
+            await asyncio.sleep(base_delay * 2 ** attempt * (1 + random.random()))   # backoff + jitter
+
+
+async def worker_pool(fn, items, concurrency=8, timeout=1.0, retries=3):
+    sem = asyncio.Semaphore(concurrency)
+
+    async def guarded(it):
+        async with sem:
+            return await run_with_retry(fn, it, timeout, retries)
+
+    return await asyncio.gather(*(guarded(i) for i in items))
+
+
+# ---------- 2. UCB1 ----------
+class UCB1:
+    def __init__(self, n_arms, c=2.0):
+        self.n, self.s, self.c, self.t = [0] * n_arms, [0.0] * n_arms, c, 0
+
+    def select(self):
+        self.t += 1
+        for i, n in enumerate(self.n):
+            if n == 0:
+                return i
+        return max(range(len(self.n)),
+                   key=lambda i: self.s[i] / self.n[i] + math.sqrt(self.c * math.log(self.t) / self.n[i]))
+
+    def update(self, i, reward):
+        self.n[i] += 1
+        self.s[i] += reward
+
+
+# ---------- 3. paired bootstrap ----------
+def paired_bootstrap(scores_a, scores_b, n_boot=5000, seed=0):
+    &quot;&quot;&quot;Per-task scores of A and B on the same tasks. Returns (mean diff, 95% CI, p(B&lt;=A)).&quot;&quot;&quot;
+    rng = random.Random(seed)
+    d = [b - a for a, b in zip(scores_a, scores_b)]
+    n = len(d)
+    means = sorted(sum(d[rng.randrange(n)] for _ in range(n)) / n for _ in range(n_boot))
+    p = sum(m &lt;= 0 for m in means) / n_boot
+    return sum(d) / n, (means[int(.025 * n_boot)], means[int(.975 * n_boot)]), p
+
+
+# ---------- 4. cache ----------
+class ResultCache:
+    def __init__(self):
+        self.store = {}
+
+    @staticmethod
+    def key(code: str, config: dict, seed: int) -&gt; str:
+        blob = json.dumps({&quot;code&quot;: code, &quot;config&quot;: config, &quot;seed&quot;: seed}, sort_keys=True)
+        return hashlib.sha256(blob.encode()).hexdigest()
+
+    def get_or_run(self, code, config, seed, run):
+        k = self.key(code, config, seed)
+        if k not in self.store:
+            self.store[k] = run()
+        return self.store[k]
+
+
+# ---------- 5. successive halving ----------
+def successive_halving(candidates, evaluate, budget0=1, eta=2):
+    &quot;&quot;&quot;evaluate(candidate, budget) -&gt; score (higher better).&quot;&quot;&quot;
+    pool, budget = list(candidates), budget0
+    while len(pool) &gt; 1:
+        scored = sorted(pool, key=lambda c: evaluate(c, budget), reverse=True)
+        pool, budget = scored[:max(1, len(pool) // eta)], budget * eta
+    return pool[0]
+
+
+if __name__ == &quot;__main__&quot;:
+    random.seed(0)
+
+    async def flaky(x):
+        await asyncio.sleep(random.random() * 0.02)
+        if random.random() &lt; 0.3:
+            raise RuntimeError(&quot;transient&quot;)
+        if x == 13:
+            await asyncio.sleep(10)           # always times out
+        return x * x
+
+    res = asyncio.run(worker_pool(flaky, range(20), concurrency=5, timeout=0.2, retries=3))
+    ok = [r for r in res if r[&quot;ok&quot;]]
+    print(f&quot;worker pool: {len(ok)}/20 ok, failed: {[r[&#x27;item&#x27;] for r in res if not r[&#x27;ok&#x27;]]}&quot;)
+    assert all(r[&quot;ok&quot;] for r in res if r[&quot;item&quot;] != 13) and not res[13][&quot;ok&quot;]
+
+    probs = [0.2, 0.5, 0.8, 0.4]
+    b = UCB1(4)
+    for _ in range(3000):
+        i = b.select(); b.update(i, float(random.random() &lt; probs[i]))
+    print(&quot;UCB pulls&quot;, b.n); assert max(range(4), key=lambda i: b.n[i]) == 2
+
+    a = [random.gauss(0.5, 0.1) for _ in range(100)]
+    bb = [x + 0.03 + random.gauss(0, 0.05) for x in a]
+    diff, ci, p = paired_bootstrap(a, bb)
+    print(f&quot;bootstrap diff {diff:.3f} CI ({ci[0]:.3f},{ci[1]:.3f}) p={p:.4f}&quot;); assert ci[0] &gt; 0
+
+    c = ResultCache(); calls = []
+    for _ in range(3):
+        c.get_or_run(&quot;print(1)&quot;, {&quot;lr&quot;: 1e-3}, 0, lambda: calls.append(1) or 0.9)
+    assert len(calls) == 1; print(&quot;cache OK (1 run for 3 requests)&quot;)
+
+    true_q = {f&quot;c{i}&quot;: random.random() for i in range(16)}
+    best = successive_halving(true_q, lambda cand, bud: true_q[cand] + random.gauss(0, 0.3 / math.sqrt(bud)))
+    print(&quot;successive halving picked&quot;, best, &quot;true best&quot;, max(true_q, key=true_q.get))
+    print(&quot;OK&quot;)
+</code></pre></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+hljs.highlightAll();
+function copyCode(btn) {
+  const code = btn.closest('.codeblock').querySelector('code').innerText;
+  navigator.clipboard.writeText(code).then(() => { btn.textContent = 'copied'; setTimeout(() => btn.textContent = 'copy', 1200); });
+}
+</script>
+</body>
+</html>

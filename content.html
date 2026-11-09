@@ -1,0 +1,213 @@
+<section id="overview">
+<h2>0. 面试形式</h2>
+<div class="grid2">
+<div class="card">
+<h3>ML Coding</h3>
+<ul>
+<li>Google Colab，basic Python 环境</li>
+<li><b>不能用 AI coding assistant</b>（练习时也要关掉 Colab 的 AI 补全）</li>
+<li>考 "foundational ML concepts"：从零手写 ML 组件，不是 LeetCode</li>
+<li>边写边讲：先说 shape 和思路，写完一段就跑一下</li>
+</ul>
+</div>
+<div class="card">
+<h3>System Design</h3>
+<ul>
+<li>按你的背景和你可能要做的工作出题</li>
+<li>共享屏幕，用 Excalidraw 画图</li>
+<li>中途可能在 Colab 里写一小段代码</li>
+<li>大概率是 research infra / agent 系统方向，而不是"设计 Twitter"</li>
+</ul>
+</div>
+</div>
+<div class="callout">回 coordinator 时可以顺便问：每轮多长、面试官是谁。知道是谁就能查他的研究方向，大致猜到题目的侧重。</div>
+</section>
+
+<section id="plan">
+<h2>1. 准备计划</h2>
+<table>
+<tr><th>时间</th><th>ML Coding</th><th>System Design</th></tr>
+<tr><td>Day 1</td><td>MLP + softmax/CE + grad check（01）；LayerNorm/BatchNorm backward（02）</td><td>画一张自己做过的系统的架构图，15 分钟能讲清楚（只讲 high-level）</td></tr>
+<tr><td>Day 2</td><td>Attention + causal/padding mask（03）；GPT block + RoPE + KV cache + sampling（04）</td><td>Mock：自我改进 / 自动化 ML 实验 agent 系统（题 A）</td></tr>
+<tr><td>Day 3</td><td>Optimizers（05）；Debug 题（06）；经典 ML（07）</td><td>Mock：大规模 agent eval / rollout 平台（题 B）</td></tr>
+<tr><td>Day 4</td><td>RL losses：REINFORCE / GAE / PPO / GRPO（08）</td><td>Mock：agent RL 训练 pipeline（题 C）+ 推理服务（题 D）</td></tr>
+<tr><td>面试前一天</td><td>不看答案，从空白 Colab 重写 03 + 04，计时 30 分钟</td><td>写一遍 09 里的 worker pool / bandit / bootstrap；背 §4 的数字</td></tr>
+</table>
+<p class="muted">练法：先看题目自己写，写完再对照 <a href="#code">代码</a>。每个脚本都有 assert 自检，<code>python 0X_xxx.py</code> 能跑到 OK 就算写对了。</p>
+</section>
+
+<section id="mlcoding">
+<h2>2. ML Coding 题库</h2>
+
+<h3>2.1 从零写模型组件（最常见）</h3>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>numpy 手写 MLP forward + backward，gradient check 验证</td><td>链式法则、每个矩阵的 shape、ReLU 的 backward、centered finite difference</td><td><a href="#c01">01</a></td></tr>
+<tr><td>softmax + cross-entropy</td><td>减掉每行最大值（log-sum-exp）；梯度 = (softmax − onehot)/N</td><td><a href="#c01">01</a></td></tr>
+<tr><td>self-attention / multi-head attention</td><td>除以 √d_head；mask 要在 softmax 之前加；causal 和 padding mask 怎么组合；(B,T,D)→(B,H,T,Dh) 的 reshape/transpose</td><td><a href="#c03">03</a></td></tr>
+<tr><td>Transformer block</td><td>pre-norm vs post-norm；残差；MLP 4× 扩展；SwiGLU</td><td><a href="#c04">04</a></td></tr>
+<tr><td>位置编码：sinusoidal / RoPE</td><td>RoPE 是对 q、k 两两维度做旋转；只作用在 q、k 上，不作用在 v 上；使用 KV cache 时 position offset 要对</td><td><a href="#c04">04</a></td></tr>
+<tr><td>LayerNorm / RMSNorm / BatchNorm forward + backward</td><td>归一化的维度；BN 训练和推理行为不同（running stats）；LN backward 的紧凑公式</td><td><a href="#c02">02</a></td></tr>
+</table>
+
+<h3>2.2 训练相关</h3>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>手写 SGD+momentum / Adam / AdamW</td><td>bias correction；Adam 里的 L2 ≠ AdamW 的 decoupled weight decay（L2 会被 1/√v 缩放）</td><td><a href="#c05">05</a></td></tr>
+<tr><td>完整训练循环（小 GPT 或 MLP，loss 要降）</td><td>zero_grad 放在哪；model.train()/eval()；数据要 shuffle</td><td><a href="#c04">04</a></td></tr>
+<tr><td>LR schedule：warmup + cosine</td><td>为什么要 warmup（Adam 初期二阶矩估计不准，训练早期不稳定）</td><td><a href="#c04">04</a></td></tr>
+<tr><td>gradient accumulation / clipping</td><td>accumulation 时 loss 要除以累积步数；clip 的是全局 norm</td><td><a href="#c04">04</a></td></tr>
+</table>
+
+<h3>2.3 推理和采样</h3>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>greedy / temperature / top-k / top-p</td><td>top-p 要保留"累计概率刚好 ≥ p 的最小前缀"，边界别写错；temperature 不能为 0（要单独处理成 greedy）</td><td><a href="#c04">04</a></td></tr>
+<tr><td>KV cache：先写 naive，再改成带 cache</td><td>prefill 和 decode 两个阶段；cache 的 shape (B,H,T,Dh)；带 cache 和不带 cache 的结果要完全一致；每生成一个 token 的复杂度从 O(T²) 降到 O(T)</td><td><a href="#c04">04</a></td></tr>
+<tr><td>beam search（少见）</td><td>length penalty；EOS 的处理</td><td>—</td></tr>
+</table>
+
+<h3>2.4 Debug 题</h3>
+<p>给一段训练代码，问 loss 为什么不降或者变成 NaN。常见埋的 bug：</p>
+<ul class="cols2">
+<li>忘了 <code>zero_grad()</code></li>
+<li><code>F.cross_entropy</code> 前面又做了一次 softmax</li>
+<li>mask 方向反了</li>
+<li>softmax / argmax 用错了维度</li>
+<li>logits 和 labels flatten 的顺序不一致</li>
+<li>广播错误（(N,) 和 (N,1) 相减）</li>
+<li>learning rate 太大 / 没有 warmup</li>
+<li>数据没有 shuffle</li>
+<li>eval 时没调 <code>model.eval()</code> / 没加 <code>no_grad</code></li>
+<li>label 是 float 而不是 long</li>
+<li>log(0) 导致 NaN</li>
+<li>logging 时没 <code>.item()</code> 或 <code>.detach()</code>，导致内存泄漏</li>
+</ul>
+<p>练习：<a href="#c06">06</a> 里有一个埋了 6 个 bug 的版本，先自己找，再看修好的版本。</p>
+
+<h3>2.5 经典 ML（偶尔考）</h3>
+<p>logistic regression + GD、k-means（k-means++ 初始化，多跑几次初始化取最优）、PCA（用 SVD 实现）、kNN（向量化算距离）、conv2d / im2col。→ <a href="#c07">07</a></p>
+
+<h3>2.6 RL（做 agent 的公司可能考）</h3>
+<table>
+<tr><th>题目</th><th>要点</th></tr>
+<tr><td>REINFORCE + baseline</td><td>∇E[R] = E[∇log π · A]；baseline 能降方差，而且不引入 bias</td></tr>
+<tr><td>GAE</td><td>δ<sub>t</sub> = r<sub>t</sub> + γV(s<sub>t+1</sub>)(1−done) − V(s<sub>t</sub>)；从后往前递推</td></tr>
+<tr><td>PPO clipped objective</td><td>ratio = exp(logp_new − logp_old)；对 ratio·A 和 clip(ratio)·A 取 min；只在 response token 上算</td></tr>
+<tr><td>GRPO</td><td>同一个 prompt 采样 G 个回答，在组内标准化 reward 得到 advantage；不需要 value network</td></tr>
+<tr><td>KL penalty</td><td>k3 估计器：exp(Δ) − Δ − 1，非负且无偏</td></tr>
+</table>
+<p>→ <a href="#c08">08</a></p>
+
+<h3>2.7 现场节奏</h3>
+<ol>
+<li>复述题目，确认输入输出的 shape 和边界条件（1 分钟）</li>
+<li>口头讲思路，标出每个张量的 shape（2 分钟）</li>
+<li>先写最简单、能跑通的版本，跑一下</li>
+<li>加测试：拿 PyTorch 自带实现做参照，或者 gradient check，或者 sanity check（概率之和为 1、mask 掉的位置为 0）</li>
+<li>再优化：数值稳定、向量化，讲清楚复杂度和显存</li>
+</ol>
+<div class="callout">最常丢分的地方：shape 和广播出错、写不出数值稳定的版本、写完不验证。</div>
+</section>
+
+<section id="sysdesign">
+<h2>3. System Design</h2>
+
+<h3>3.1 时间分配（按 45–60 分钟算）</h3>
+<ol>
+<li><b>澄清需求，5 分钟</b>：目标是什么、规模多大（同时跑多少任务、算力预算多少）、怎么衡量成功、哪些地方允许出错</li>
+<li><b>整体架构，10 分钟</b>：先把各组件和数据流画出来，不要一开始就钻细节</li>
+<li><b>深入 2–3 个组件，20 分钟</b>：主动选你最强的部分，同时看面试官想往哪个方向追问</li>
+<li><b>规模、失败和取舍，10 分钟</b>：瓶颈在哪、挂了怎么恢复、成本怎么控制</li>
+<li><b>怎么证明系统真的有效，5 分钟</b>：research 公司特别看重这一块</li>
+</ol>
+
+<h3>3.2 题库</h3>
+<details open><summary><b>A. 自我改进 / 自动化 ML research 的 agent 系统</b>（最可能）</summary>
+<p>给一个任务和评估指标，系统自己提方案、跑实验、迭代。</p>
+<ul>
+<li><b>生成候选</b>：LLM 提方案，加上历史尝试记录（memory），避免重复试一样的想法；历史记录怎么压缩后喂给 LLM</li>
+<li><b>搜索策略</b>：tree search、进化、bandit（UCB / Thompson sampling）、successive halving。讲清楚怎么平衡探索和利用，以及预算怎么分配</li>
+<li><b>执行</b>：每个候选在沙箱里跑，用容器隔离，设好超时、CPU/GPU/内存限制和网络隔离</li>
+<li><b>评估</b>：分开 held-out 和 validation 数据，用多个 seed 处理噪声，结果要做显著性检验（paired bootstrap）</li>
+<li><b>风险</b>：过拟合 eval、reward hacking（改 eval 代码、读 test label、硬编码答案）、eval 泄漏。对策：eval 放在 agent 碰不到的环境里，把 validation 和 test 分开，加 sanity check，定期人工抽查</li>
+<li><b>工程</b>：结果缓存（按代码 + 配置 + seed 做 hash）、重复候选去重、失败重试，每个改进怎么来的、跑出什么结果都要能追溯和复现</li>
+<li><b>指标</b>：单位成本带来的提升、多久找到最优解、改进能不能迁移到 held-out 任务</li>
+</ul>
+</details>
+<details><summary><b>B. 大规模 agent eval / rollout 平台</b></summary>
+<ul>
+<li>任务队列 + 调度（K8s / Ray），GPU 推理和 CPU 沙箱分开调度和扩缩容</li>
+<li>LLM 调用走一个单独的推理服务（vLLM / SGLang），做 batching 和限流；用外部 API 时要处理 rate limit、重试和成本上限</li>
+<li>沙箱：镜像预构建 + 缓存，冷启动要快；多步工具调用时环境状态怎么管理；超时处理</li>
+<li>结果的确定性：固定 seed / temperature，记录模型版本和镜像 hash</li>
+<li>存储：结构化结果放数据库，完整 trajectory 放对象存储；能按任务、模型、版本查询和对比</li>
+<li>可观测性：dashboard、失败原因自动分类（环境错误 / 超时 / 模型错误）、成本监控</li>
+<li>规模估算示例：1 万个 rollout × 每个 10 分钟 ÷ 2 小时完成 → 大约 830 个并发沙箱</li>
+</ul>
+</details>
+<details><summary><b>C. Agent RL 训练 pipeline</b></summary>
+<ul>
+<li>actor（vLLM 生成 rollout）和 learner（FSDP / Megatron 训练）分开部署；同步训练 vs 异步训练</li>
+<li>异步训练时数据 staleness 怎么处理：限制 policy 版本差、用 importance ratio 修正或 clip、丢掉太旧的数据</li>
+<li>权重同步到 actor：NCCL broadcast / 写到共享存储，多久同步一次</li>
+<li>奖励：verifier / 单测 / reward model；长任务奖励稀疏，credit assignment 怎么做；防 reward hacking</li>
+<li>多轮工具调用：环境放在单独的服务里；tool 返回的 token 要 mask 掉，不算进 loss</li>
+<li>长尾问题：有些 rollout 特别长，会拖慢整批 → 部分 rollout 先训、超时截断、动态 batch</li>
+<li>监控：reward 曲线、KL、entropy、response 长度、各种 clip 被触发的比例</li>
+</ul>
+</details>
+<details><summary><b>D. LLM 推理服务</b></summary>
+<ul>
+<li>continuous batching；prefill 和 decode 两个阶段的特点不同（prefill 受算力限制，decode 受显存带宽限制）</li>
+<li>KV cache 显存管理：PagedAttention、prefix caching（相同的 system prompt / few-shot 前缀可以复用）</li>
+<li>throughput 和 latency 的取舍：batch size、TTFT（首 token 延迟）、TPOT（每个 token 的生成时间）</li>
+<li>多模型路由、量化、speculative decoding、tensor parallel</li>
+</ul>
+</details>
+<details><summary><b>E. 其他可能的题</b></summary>
+<ul>
+<li>训练数据 pipeline：爬取 → 去重（MinHash）→ 质量过滤 → 配比；怎么防止 eval 数据污染训练数据（n-gram overlap 检测）</li>
+<li>大规模分布式训练：DP / TP / PP / FSDP 分别切什么；怎么存 checkpoint，节点挂了怎么恢复</li>
+<li>实验追踪和复现系统：怎么管理配置、代码版本（git commit）、随机种子、数据版本和产出文件</li>
+<li>reward model / verifier 服务，以及怎么防 reward hacking</li>
+</ul>
+</details>
+
+<h3>3.3 几乎每道题都会追问的点</h3>
+<ul class="cols2">
+<li><b>规模估算</b>：多少张 GPU、跑多久、花多少钱、能撑多少并发</li>
+<li><b>出错了怎么办</b>：任务挂掉、节点挂掉、结果不确定（同样输入跑出不同结果）、重试要幂等</li>
+<li><b>评估可信度</b>：噪声怎么处理、要不要多个 seed、held-out 集、显著性检验</li>
+<li><b>安全和隔离</b>：沙箱逃逸、网络访问、资源耗尽</li>
+<li><b>取舍</b>：为什么选同步而不是异步，代价是什么，怎么缓解</li>
+<li><b>演进</b>：先做 MVP，规模扩大 10 倍时哪里先成为瓶颈</li>
+</ul>
+
+<h3>3.4 中途可能要写的代码</h3>
+<p>一般是小组件，提前写一遍就不会卡（→ <a href="#c09">09</a>）：async worker pool 加超时、重试和指数退避；UCB bandit；paired bootstrap 显著性检验；结果缓存和去重；successive halving。</p>
+
+<h3>3.5 准备清单</h3>
+<ul>
+<li>☐ 在 Excalidraw 里画一张自己做过的系统的架构图，15 分钟能讲完。只讲 high-level，不提客户名字和项目细节</li>
+<li>☐ A / B / C / D 每类题各做一次 mock，计时 45 分钟，大声讲出来，边讲边画</li>
+<li>☐ 练画图速度：真到面试时，大部分人卡在画图慢，而不是不会设计</li>
+<li>☐ 每个设计里都主动讲 trade-off："这里选 X，代价是 Y，所以加了 Z 来缓解"</li>
+<li>☐ 看一下对方公司的公开 blog / 论文和面试官的背景</li>
+</ul>
+</section>
+
+<section id="numbers">
+<h2>4. 要背熟的数字</h2>
+<table>
+<tr><th>项目</th><th>数</th></tr>
+<tr><td>参数显存（bf16）</td><td>2 bytes × 参数量：7B 约 14GB，70B 约 140GB</td></tr>
+<tr><td>训练显存（mixed precision + Adam）</td><td>约 16 bytes / 参数（bf16 权重 2、梯度 2、fp32 master 权重 4、Adam m 和 v 共 8），还没算 activation</td></tr>
+<tr><td>KV cache 大小</td><td>2 (K,V) × 层数 × KV 头数 × head_dim × 2 bytes，算出来是每个 token 的大小；Llama-2-7B（32 层，32 头 × 128）约 0.5MB/token，4k 上下文约 2GB；用 GQA 可以按比例缩小</td></tr>
+<tr><td>训练 FLOPs</td><td>≈ 6 × 参数量 × token 数（forward 2N + backward 4N）</td></tr>
+<tr><td>推理 FLOPs</td><td>≈ 2 × 参数量 / token</td></tr>
+<tr><td>H100</td><td>约 1000 TFLOPS（bf16 dense）、80GB HBM、带宽约 3.35 TB/s；实际 MFU 一般在 40–50%</td></tr>
+<tr><td>decode 吞吐上限（batch 为 1）</td><td>约等于显存带宽 ÷ 权重大小：7B bf16 在 H100 上约 3.35TB/s ÷ 14GB ≈ 240 tokens/s</td></tr>
+<tr><td>Attention 复杂度</td><td>时间 O(T²·d)，score 矩阵占显存 O(T²)（FlashAttention 不把整个矩阵放进显存）</td></tr>
+</table>
+</section>
