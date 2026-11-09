@@ -16,6 +16,7 @@ TITLES = {
     "08": "RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)",
     "09": "System-design snippets: worker pool, UCB, bootstrap, cache, halving",
     "10": "LeetCode patterns: 16 patterns, ~35 canonical problems with tests",
+    "11": "MHA + KV cache + GQA/MQA from scratch (torch)",
 }
 
 code_index = "".join(
