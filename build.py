@@ -15,6 +15,7 @@ TITLES = {
     "07": "Classic ML: logreg, k-means, PCA, kNN, conv2d im2col (numpy)",
     "08": "RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)",
     "09": "System-design snippets: worker pool, UCB, bootstrap, cache, halving",
+    "10": "LeetCode patterns: 16 patterns, ~35 canonical problems with tests",
 }
 
 code_index = "".join(
@@ -74,6 +75,7 @@ pre code {{ background:none; padding:14px 16px !important; font-size:12.5px; lin
 <a href="#overview">0. 面试形式</a>
 <a href="#plan">1. 准备计划</a>
 <a href="#mlcoding">2. ML Coding 题库</a>
+<a class="sub" href="#leetcode">2.8 LeetCode 风格</a>
 <a href="#sysdesign">3. System Design</a>
 <a href="#numbers">4. 要背熟的数字</a>
 <a href="#code">5. 代码</a>

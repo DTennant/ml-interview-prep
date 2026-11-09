@@ -29,8 +29,8 @@
 <tr><th>时间</th><th>ML Coding</th><th>System Design</th></tr>
 <tr><td>Day 1</td><td>MLP + softmax/CE + grad check（01）；LayerNorm/BatchNorm backward（02）</td><td>画一张自己做过的系统的架构图，15 分钟能讲清楚（只讲 high-level）</td></tr>
 <tr><td>Day 2</td><td>Attention + causal/padding mask（03）；GPT block + RoPE + KV cache + sampling（04）</td><td>Mock：自我改进 / 自动化 ML 实验 agent 系统（题 A）</td></tr>
-<tr><td>Day 3</td><td>Optimizers（05）；Debug 题（06）；经典 ML（07）</td><td>Mock：大规模 agent eval / rollout 平台（题 B）</td></tr>
-<tr><td>Day 4</td><td>RL losses：REINFORCE / GAE / PPO / GRPO（08）</td><td>Mock：agent RL 训练 pipeline（题 C）+ 推理服务（题 D）</td></tr>
+<tr><td>Day 3</td><td>Optimizers（05）；Debug 题（06）；经典 ML（07）；LeetCode 模式 1–8（10）</td><td>Mock：大规模 agent eval / rollout 平台（题 B）</td></tr>
+<tr><td>Day 4</td><td>RL losses：REINFORCE / GAE / PPO / GRPO（08）；LeetCode 模式 9–16（10）</td><td>Mock：agent RL 训练 pipeline（题 C）+ 推理服务（题 D）</td></tr>
 <tr><td>面试前一天</td><td>不看答案，从空白 Colab 重写 03 + 04，计时 30 分钟</td><td>写一遍 09 里的 worker pool / bandit / bootstrap；背 §4 的数字</td></tr>
 </table>
 <p class="muted">练法：先看题目自己写，写完再对照 <a href="#code">代码</a>。每个脚本都有 assert 自检，<code>python 0X_xxx.py</code> 能跑到 OK 就算写对了。</p>
@@ -108,6 +108,39 @@
 <li>再优化：数值稳定、向量化，讲清楚复杂度和显存</li>
 </ol>
 <div class="callout">最常丢分的地方：shape 和广播出错、写不出数值稳定的版本、写完不验证。</div>
+</section>
+
+<section id="leetcode">
+<h2>2.8 LeetCode 风格算法题</h2>
+<p>Brandon 提到也可能出这类题。按"模式"准备比刷题量更有效：每个模式吃透一道代表题，碰到新题先判断它属于哪个模式。全部实现和测试在 <a href="#c10">10</a>。</p>
+<table>
+<tr><th>模式</th><th>信号（看到这些就往这里想）</th><th>代表题</th><th>复杂度</th></tr>
+<tr><td>哈希 / 前缀和</td><td>找配对、计数、"和为 k 的子数组"</td><td>Two Sum (1)、Group Anagrams (49)、Subarray Sum = K (560)</td><td>O(n)</td></tr>
+<tr><td>滑动窗口</td><td>连续子串或子数组，"最长 / 最短，满足某条件"</td><td>Longest Substring w/o Repeat (3)、Min Window Substring (76)</td><td>O(n)</td></tr>
+<tr><td>双指针</td><td>有序数组、两端往中间收缩、去重</td><td>3Sum (15)、Container With Most Water (11)</td><td>O(n²) / O(n)</td></tr>
+<tr><td>二分查找</td><td>有序 / 旋转数组；"最小的满足条件的值" → 对答案二分</td><td>Search Rotated (33)、Koko Eating Bananas (875)</td><td>O(log n)</td></tr>
+<tr><td>堆</td><td>top-k、合并 k 路、动态中位数</td><td>Top K Frequent (347)、Merge K Sorted (23)、Median from Stream (295)</td><td>O(n log k)</td></tr>
+<tr><td>单调栈</td><td>"下一个更大 / 更小的元素"、柱状图</td><td>Daily Temperatures (739)、Largest Rectangle (84)</td><td>O(n)</td></tr>
+<tr><td>区间</td><td>合并、重叠、需要几个会议室</td><td>Merge Intervals (56)、Meeting Rooms II (253)</td><td>O(n log n)</td></tr>
+<tr><td>BFS / DFS</td><td>网格、连通块、无权图最短路</td><td>Number of Islands (200)、Shortest Path in Binary Matrix (1091)</td><td>O(V+E)</td></tr>
+<tr><td>拓扑排序</td><td>依赖关系、判环、任务调度顺序</td><td>Course Schedule I/II (207/210)</td><td>O(V+E)</td></tr>
+<tr><td>并查集</td><td>动态连通性、数连通块、合并分组</td><td>Number of Connected Components (323)</td><td>≈O(α(n))</td></tr>
+<tr><td>Dijkstra</td><td>带非负权图的最短路</td><td>Network Delay Time (743)</td><td>O(E log V)</td></tr>
+<tr><td>Trie</td><td>前缀查询、自动补全、词典</td><td>Implement Trie (208)</td><td>O(L)</td></tr>
+<tr><td>回溯</td><td>枚举所有子集、排列、组合</td><td>Subsets (78)、Permutations (46)、Combination Sum (39)</td><td>指数级</td></tr>
+<tr><td>动态规划</td><td>"最少 / 最多 / 有几种方法"，有最优子结构</td><td>Coin Change (322)、LIS (300)、Edit Distance (72)、LCS (1143)</td><td>O(n²) / O(nm)</td></tr>
+<tr><td>设计</td><td>要求 O(1) 的 get/put</td><td>LRU Cache (146)：hashmap + 双向链表</td><td>O(1)</td></tr>
+<tr><td>ML 公司常考的</td><td>采样、流式数据、稀疏计算</td><td>Reservoir Sampling、Random Pick with Weight (528)、Sparse MatMul、Kth Largest (215, quickselect)</td><td>—</td></tr>
+</table>
+<h3>现场流程</h3>
+<ol>
+<li>复述题目，问清楚输入范围、有没有重复、有没有负数、空输入怎么处理</li>
+<li>先说暴力解法和它的复杂度，再说优化思路，面试官点头了再写</li>
+<li>写的时候变量名要清楚，边写边说</li>
+<li>写完手动走一遍小例子，再跑 edge case：空、单个元素、重复、全一样</li>
+<li>最后主动说出时间和空间复杂度</li>
+</ol>
+<div class="callout">要准备的题量：上面 16 个模式、约 30 道代表题，每道能在 15–20 分钟内写出来（不用 AI、不查文档）就够了。Python 常用工具要熟：<code>collections.Counter / defaultdict / deque</code>、<code>heapq</code>（默认是最小堆，最大堆要取负）、<code>bisect</code>、<code>functools.lru_cache</code>。</div>
 </section>
 
 <section id="sysdesign">
