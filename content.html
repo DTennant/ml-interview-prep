@@ -186,17 +186,18 @@
 <tr><td>P07</td><td>Dropout</td><td>除以 (1−p)；eval 原样返回</td></tr>
 <tr><td>P08</td><td>scaled dot-product attention</td><td>T≠S 时 causal 要 <code>tril(diagonal=S−T)</code>；整行被 mask 出 NaN → 0</td></tr>
 <tr><td>P09</td><td>RoPE / sinusoidal PE</td><td>RoPE 保持范数、内积只跟相对位置有关；offset 用绝对位置</td></tr>
-<tr><td>P10</td><td>MHA / GQA / MQA</td><td>q 头 h 用 kv 头 h // G；和 SDPA(enable_gqa) 对齐</td></tr>
-<tr><td>P11</td><td>KV cache 逐 token decode</td><td>结果必须等于 full forward；k 先加 RoPE 再进 cache</td></tr>
-<tr><td>P12</td><td>temperature / top-k / top-p</td><td>T=0 = greedy；累计概率 ≥ p 的最小前缀；至少保留 1 个</td></tr>
-<tr><td>P13</td><td>AdamW 单步</td><td>bias correction 的 t 从 1 开始；decoupled weight decay</td></tr>
-<tr><td>P14</td><td>全局 grad-norm clip + warmup-cosine</td><td>clip 的是所有参数拼起来的 norm；返回 clip 前的 norm</td></tr>
-<tr><td>P15</td><td>KL：精确值 + k1/k3 估计器</td><td>方向 KL(P‖Q)；k3 = r−1−log r 非负、无偏</td></tr>
-<tr><td>P16</td><td>序列 log-prob + DPO + Bradley-Terry</td><td>只对 response token 求和；用 softplus(−z) 写，大 margin 不溢出；policy = ref 时 DPO loss = log 2</td></tr>
-<tr><td>P17</td><td>GRPO advantage + PPO clip</td><td>组内 reward 全相同 → advantage 为 0；被 clip 的 token 没有梯度；只在 response token 上平均</td></tr>
-<tr><td>P18</td><td>MoE top-k router + 负载均衡 loss</td><td>top-k 后重新归一化 gate；aux = E·Σ f<sub>i</sub>P<sub>i</sub>，均匀时 = 1</td></tr>
-<tr><td>P19</td><td>LoRA</td><td>B 初始化为 0 → 一开始和 base 完全一样；scale = α/r；merge 后结果不变</td></tr>
-<tr><td>P20</td><td>BPE tokenizer</td><td>按训练顺序 apply merge；encode→decode 能还原，包括中文等多字节字符</td></tr>
+<tr><td>P10</td><td>Multi-head attention</td><td>packed in_proj (3D, D) 按 q/k/v 拆；split heads → (B,H,T,Dh)，merge 时先 transpose 再 reshape；key_padding_mask 遮的是 key 列；和 nn.MultiheadAttention 对齐</td></tr>
+<tr><td>P11</td><td>GQA / MQA</td><td>q 头 h 用 kv 头 h // G；和 SDPA(enable_gqa) 对齐</td></tr>
+<tr><td>P12</td><td>KV cache 逐 token decode</td><td>结果必须等于 full forward；k 先加 RoPE 再进 cache</td></tr>
+<tr><td>P13</td><td>temperature / top-k / top-p</td><td>T=0 = greedy；累计概率 ≥ p 的最小前缀；至少保留 1 个</td></tr>
+<tr><td>P14</td><td>AdamW 单步</td><td>bias correction 的 t 从 1 开始；decoupled weight decay</td></tr>
+<tr><td>P15</td><td>全局 grad-norm clip + warmup-cosine</td><td>clip 的是所有参数拼起来的 norm；返回 clip 前的 norm</td></tr>
+<tr><td>P16</td><td>KL：精确值 + k1/k3 估计器</td><td>方向 KL(P‖Q)；k3 = r−1−log r 非负、无偏</td></tr>
+<tr><td>P17</td><td>序列 log-prob + DPO + Bradley-Terry</td><td>只对 response token 求和；用 softplus(−z) 写，大 margin 不溢出；policy = ref 时 DPO loss = log 2</td></tr>
+<tr><td>P18</td><td>GRPO advantage + PPO clip</td><td>组内 reward 全相同 → advantage 为 0；被 clip 的 token 没有梯度；只在 response token 上平均</td></tr>
+<tr><td>P19</td><td>MoE top-k router + 负载均衡 loss</td><td>top-k 后重新归一化 gate；aux = E·Σ f<sub>i</sub>P<sub>i</sub>，均匀时 = 1</td></tr>
+<tr><td>P20</td><td>LoRA</td><td>B 初始化为 0 → 一开始和 base 完全一样；scale = α/r；merge 后结果不变</td></tr>
+<tr><td>P21</td><td>BPE tokenizer</td><td>按训练顺序 apply merge；encode→decode 能还原，包括中文等多字节字符</td></tr>
 </table>
 <p>练习方式：先下载空白版 <a href="practice/13_ml_leetcode_torch_blank.py" download>13_ml_leetcode_torch_blank.py</a>（函数体都换成了 <code>NotImplementedError</code>，测试保持一样），自己填完跑到 <code>OK</code>，再对照答案 <a href="#c13">13</a>。每题限时 10 到 15 分钟。</p>
 </section>

@@ -17,7 +17,7 @@ TITLES = {
     "09": "System-design snippets: worker pool, UCB, bootstrap, cache, halving",
     "10": "LeetCode patterns: 16 patterns, ~35 canonical problems with tests",
     "11": "MHA + KV cache + GQA/MQA from scratch (torch)",
-    "13": "LLM problems in LeetCode format (PyTorch): 20 problems, hidden tests vs torch reference",
+    "13": "LLM problems in LeetCode format (PyTorch): 21 problems, hidden tests vs torch reference",
     "12": "Perplexity: from logits, masking, corpus aggregation, sliding window, n-gram, bits/byte",
 }
 
