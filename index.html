@@ -48,7 +48,7 @@ pre code { background:none; padding:14px 16px !important; font-size:12.5px; line
 <a href="#sysdesign">3. System Design</a>
 <a href="#numbers">4. 要背熟的数字</a>
 <a href="#code">5. 代码</a>
-<a class="sub" href="#c01">01_mlp_numpy.py</a><a class="sub" href="#c02">02_norms_numpy.py</a><a class="sub" href="#c03">03_attention_numpy.py</a><a class="sub" href="#c04">04_gpt_torch.py</a><a class="sub" href="#c05">05_optimizers_numpy.py</a><a class="sub" href="#c06">06_debug_training.py</a><a class="sub" href="#c07">07_classic_ml_numpy.py</a><a class="sub" href="#c08">08_rl_losses_torch.py</a><a class="sub" href="#c09">09_sysdesign_snippets.py</a><a class="sub" href="#c10">10_leetcode_patterns.py</a><a class="sub" href="#c11">11_mha_kvcache_gqa.py</a>
+<a class="sub" href="#c01">01_mlp_numpy.py</a><a class="sub" href="#c02">02_norms_numpy.py</a><a class="sub" href="#c03">03_attention_numpy.py</a><a class="sub" href="#c04">04_gpt_torch.py</a><a class="sub" href="#c05">05_optimizers_numpy.py</a><a class="sub" href="#c06">06_debug_training.py</a><a class="sub" href="#c07">07_classic_ml_numpy.py</a><a class="sub" href="#c08">08_rl_losses_torch.py</a><a class="sub" href="#c09">09_sysdesign_snippets.py</a><a class="sub" href="#c10">10_leetcode_patterns.py</a><a class="sub" href="#c11">11_mha_kvcache_gqa.py</a><a class="sub" href="#c12">12_perplexity.py</a>
 </nav>
 <main>
 <h1 style="margin-top:0">ML Coding &amp; System Design 面试准备</h1>
@@ -131,6 +131,24 @@ pre code { background:none; padding:14px 16px !important; font-size:12.5px; line
 <tr><td>KV cache：先写 naive，再改成带 cache</td><td>prefill 和 decode 两个阶段；cache 的 shape (B,H,T,Dh)；带 cache 和不带 cache 的结果要完全一致；每生成一个 token 的复杂度从 O(T²) 降到 O(T)</td><td><a href="#c04">04</a></td></tr>
 <tr><td>beam search（少见）</td><td>length penalty；EOS 的处理</td><td>—</td></tr>
 </table>
+
+<h3>2.3b Perplexity（评估类常考）</h3>
+<p>定义：PPL = exp(−(1/N) Σ log p(x<sub>i</sub> | x<sub>&lt;i</sub>)) = exp(平均 token 交叉熵，单位 nats)。直觉：模型每一步平均在多少个等概率选项里"犹豫"。</p>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>给 logits 和 input_ids 算 PPL</td><td>错位：logits[:, :-1] 预测 ids[:, 1:]；手写 log-softmax 要减 max；padding / prompt token 要 mask 掉；和 <code>exp(F.cross_entropy(..., ignore_index=-100))</code> 对齐</td><td><a href="#c12">12</a></td></tr>
+<tr><td>一个 batch / 整个语料的 PPL</td><td>按 token 加权：exp(总 NLL / 总 token 数)。<b>不是</b>每条序列 PPL 的平均（短序列权重被放大，而且 mean(exp) ≥ exp(mean)）</td><td><a href="#c12">12</a></td></tr>
+<tr><td>文本比 context 长</td><td>sliding window：stride &lt; window，窗口前段只当 context（label 设成 -100），每个 token 只算一次；stride = window（不重叠切块）更便宜，但每块开头的 token 上下文太少，PPL 偏高</td><td><a href="#c12">12</a></td></tr>
+<tr><td>n-gram LM 的 PPL</td><td>加 &lt;s&gt; / &lt;/s&gt;；add-k 平滑让未见过的 n-gram 概率不为 0；OOV 映射到 &lt;unk&gt;；检查每个 history 下概率和为 1</td><td><a href="#c12">12</a></td></tr>
+</table>
+<p>常见追问：</p>
+<ul>
+<li>sanity 值：完美模型 = 1；均匀分布 = V；刚初始化的 LM ≈ V（所以初始 loss ≈ ln V，vocab 50k 时约 10.8）</li>
+<li>以 2 为底：PPL = 2<sup>bits/token</sup>；bits/token = nats/token ÷ ln 2</li>
+<li>不同 tokenizer 的 PPL 不能直接比 → 用 bits-per-byte = 总 NLL / (ln 2 × 字节数)</li>
+<li>PPL 低不等于生成好：不反映事实性、指令遵循、多样性；对 RLHF/对齐后的模型 PPL 通常会变高</li>
+<li>大语料累加 NLL 用 float64，避免精度损失</li>
+</ul>
 
 <h3>2.4 Debug 题</h3>
 <p>给一段训练代码，问 loss 为什么不降或者变成 NaN。常见埋的 bug：</p>
@@ -313,7 +331,7 @@ pre code { background:none; padding:14px 16px !important; font-size:12.5px; line
 <section id="code">
 <h2>5. 代码</h2>
 <p>在本地或 Colab 运行：<code>pip install numpy torch</code>，然后 <code>python 01_mlp_numpy.py</code>。建议先自己从空白写一遍，再来对照。</p>
-<ul><li><a href="#c01">01_mlp_numpy.py</a> — MLP + softmax/CE + grad check (numpy)</li><li><a href="#c02">02_norms_numpy.py</a> — LayerNorm / RMSNorm / BatchNorm backward (numpy)</li><li><a href="#c03">03_attention_numpy.py</a> — Multi-head attention + masks (numpy)</li><li><a href="#c04">04_gpt_torch.py</a> — Mini GPT: RoPE, KV cache, sampling, AdamW, warmup/cosine (torch)</li><li><a href="#c05">05_optimizers_numpy.py</a> — SGD / Adam / AdamW from scratch (numpy, vs torch)</li><li><a href="#c06">06_debug_training.py</a> — Debug drill: buggy vs fixed training loop (torch)</li><li><a href="#c07">07_classic_ml_numpy.py</a> — Classic ML: logreg, k-means, PCA, kNN, conv2d im2col (numpy)</li><li><a href="#c08">08_rl_losses_torch.py</a> — RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)</li><li><a href="#c09">09_sysdesign_snippets.py</a> — System-design snippets: worker pool, UCB, bootstrap, cache, halving</li><li><a href="#c10">10_leetcode_patterns.py</a> — LeetCode patterns: 16 patterns, ~35 canonical problems with tests</li><li><a href="#c11">11_mha_kvcache_gqa.py</a> — MHA + KV cache + GQA/MQA from scratch (torch)</li></ul>
+<ul><li><a href="#c01">01_mlp_numpy.py</a> — MLP + softmax/CE + grad check (numpy)</li><li><a href="#c02">02_norms_numpy.py</a> — LayerNorm / RMSNorm / BatchNorm backward (numpy)</li><li><a href="#c03">03_attention_numpy.py</a> — Multi-head attention + masks (numpy)</li><li><a href="#c04">04_gpt_torch.py</a> — Mini GPT: RoPE, KV cache, sampling, AdamW, warmup/cosine (torch)</li><li><a href="#c05">05_optimizers_numpy.py</a> — SGD / Adam / AdamW from scratch (numpy, vs torch)</li><li><a href="#c06">06_debug_training.py</a> — Debug drill: buggy vs fixed training loop (torch)</li><li><a href="#c07">07_classic_ml_numpy.py</a> — Classic ML: logreg, k-means, PCA, kNN, conv2d im2col (numpy)</li><li><a href="#c08">08_rl_losses_torch.py</a> — RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)</li><li><a href="#c09">09_sysdesign_snippets.py</a> — System-design snippets: worker pool, UCB, bootstrap, cache, halving</li><li><a href="#c10">10_leetcode_patterns.py</a> — LeetCode patterns: 16 patterns, ~35 canonical problems with tests</li><li><a href="#c11">11_mha_kvcache_gqa.py</a> — MHA + KV cache + GQA/MQA from scratch (torch)</li><li><a href="#c12">12_perplexity.py</a> — Perplexity: from logits, masking, corpus aggregation, sliding window, n-gram, bits/byte</li></ul>
 <div class="codeblock" id="c01">
 <div class="codehead"><span>01_mlp_numpy.py — MLP + softmax/CE + grad check (numpy)</span>
 <span><a href="code/01_mlp_numpy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
@@ -2119,6 +2137,201 @@ if __name__ == &quot;__main__&quot;:
     mqa = kv_cache_bytes(80, 1, 128, 4096)
     print(f&quot;KV cache @4k, 80 layers, bf16: MHA {mha / 2**30:.1f} GiB | GQA(8) {gqa / 2**30:.2f} GiB | MQA {mqa / 2**30:.3f} GiB&quot;)
     assert mha == 8 * gqa == 64 * mqa
+    print(&quot;OK&quot;)
+</code></pre></div><div class="codeblock" id="c12">
+<div class="codehead"><span>12_perplexity.py — Perplexity: from logits, masking, corpus aggregation, sliding window, n-gram, bits/byte</span>
+<span><a href="code/12_perplexity.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;Perplexity from scratch (torch + plain python), with tests.
+
+Covers the usual interview variants:
+  1. PPL from logits: shift by one, stable log-softmax by hand, ignore padding  (== F.cross_entropy reference)
+  2. Batch aggregation: corpus PPL = exp(total NLL / total tokens), NOT mean of per-sequence PPLs
+  3. Sliding-window (strided) PPL for texts longer than the model context (HF-style, context tokens masked out)
+  4. n-gram LM perplexity with add-k smoothing (classic NLP version, pure python)
+  5. Bits-per-token / bits-per-byte (tokenizer-independent comparison)
+
+Interview checklist:
+- PPL = exp( -1/N * sum_i log p(x_i | x_&lt;i) ) = exp(cross-entropy in nats). base-2 version: 2^(bits per token)
+- shift: logits[:, :-1] predict labels[:, 1:]; the first token has no prediction (unless there is a BOS)
+- mask padding (and prompt tokens if you only want PPL on the response): sum NLL over real tokens, divide by their count
+- aggregate over a corpus with token-weighted mean; mean of per-sequence PPL is biased toward short sequences and
+  is not exp(mean NLL) (Jensen: mean(exp(x)) &gt;= exp(mean(x)))
+- sanity values: perfect model -&gt; 1; uniform over V -&gt; V; random-init LM -&gt; ~V; PPL &gt;= 1
+- PPL depends on the tokenizer: different vocab -&gt; not comparable. Use bits-per-byte: total_NLL / (ln2 * n_bytes)
+- long text: sliding window with stride &lt; window; each token is scored once, with as much left context as possible.
+  stride == window (disjoint chunks) is cheaper but gives worse (higher) PPL because early tokens of each chunk
+  see little context
+- numerics: log_softmax = x - max - log(sum(exp(x - max))); accumulate NLL in float64 for big corpora
+&quot;&quot;&quot;
+import math
+from collections import Counter
+
+import torch
+import torch.nn.functional as F
+
+
+# ---------------------------------------------------------------- 1. from logits
+def log_softmax(x, dim=-1):
+    m = x.max(dim=dim, keepdim=True).values
+    return x - m - (x - m).exp().sum(dim=dim, keepdim=True).log()
+
+
+def nll_sum_and_count(logits, input_ids, attention_mask=None):
+    &quot;&quot;&quot;logits (B,T,V) from a causal LM fed input_ids (B,T). Returns (sum NLL over predicted tokens, #tokens).&quot;&quot;&quot;
+    logits = logits[:, :-1]                      # position t predicts token t+1
+    targets = input_ids[:, 1:]
+    logp = log_softmax(logits.double(), -1)
+    tok_logp = logp.gather(-1, targets.unsqueeze(-1)).squeeze(-1)     # (B,T-1)
+    if attention_mask is None:
+        mask = torch.ones_like(targets, dtype=torch.double)
+    else:
+        mask = attention_mask[:, 1:].double()   # a target counts only if it is a real token
+    return -(tok_logp * mask).sum(), mask.sum()
+
+
+def perplexity(logits, input_ids, attention_mask=None):
+    nll, n = nll_sum_and_count(logits, input_ids, attention_mask)
+    return math.exp(nll.item() / n.item())
+
+
+def per_sequence_ppl(logits, input_ids, attention_mask):
+    return [perplexity(logits[i:i + 1], input_ids[i:i + 1], attention_mask[i:i + 1]) for i in range(len(input_ids))]
+
+
+# ---------------------------------------------------------------- toy &quot;model&quot; with a limited context
+class BigramLM(torch.nn.Module):
+    &quot;&quot;&quot;logits at position t depend only on token t -&gt; a model with effective context 1. Has a hard max length
+    so we can exercise sliding-window evaluation.&quot;&quot;&quot;
+
+    def __init__(self, V, max_len, seed=0):
+        super().__init__()
+        g = torch.Generator().manual_seed(seed)
+        self.table = torch.randn(V, V, generator=g, dtype=torch.double) * 2
+        self.max_len = max_len
+
+    def forward(self, ids):
+        assert ids.shape[1] &lt;= self.max_len, &quot;input longer than context&quot;
+        return self.table[ids]                   # (B,T,V)
+
+
+# ---------------------------------------------------------------- 3. sliding window
+def sliding_window_ppl(model, ids, window, stride):
+    &quot;&quot;&quot;ids: (1, N). Each token from position 1 onward is scored exactly once; the first `window - trg_len` tokens of
+    each window are context only (label masked). Mirrors the HF &#x27;perplexity of fixed-length models&#x27; recipe.&quot;&quot;&quot;
+    N = ids.shape[1]
+    total_nll, total_n = 0.0, 0
+    prev_end = 1                                 # token 0 can never be predicted
+    for begin in range(0, N, stride):
+        end = min(begin + window, N)
+        chunk = ids[:, begin:end]
+        logits = model(chunk)[:, :-1].double()
+        targets = chunk[:, 1:]
+        tok_logp = log_softmax(logits, -1).gather(-1, targets.unsqueeze(-1)).squeeze(-1)[0]
+        # target at chunk index j+1 corresponds to absolute position begin+j+1; score only new ones (&gt;= prev_end)
+        abs_pos = torch.arange(begin + 1, end)
+        new = abs_pos &gt;= prev_end
+        total_nll += -tok_logp[new].sum().item()
+        total_n += int(new.sum())
+        prev_end = end
+        if end == N:
+            break
+    # stride &lt; window: every token 1..N-1 scored once. stride == window (disjoint chunks): the first token of each
+    # chunk has no context inside the chunk, so it is never scored -&gt; fewer tokens and a pessimistic PPL.
+    return math.exp(total_nll / total_n), total_n
+
+
+# ---------------------------------------------------------------- 4. n-gram LM
+def train_ngram(tokens, n):
+    ctx, full = Counter(), Counter()
+    padded = [&quot;&lt;s&gt;&quot;] * (n - 1) + tokens + [&quot;&lt;/s&gt;&quot;]
+    for i in range(n - 1, len(padded)):
+        h = tuple(padded[i - n + 1:i])
+        ctx[h] += 1
+        full[h + (padded[i],)] += 1
+    vocab = set(tokens) | {&quot;&lt;/s&gt;&quot;, &quot;&lt;unk&gt;&quot;}
+    return ctx, full, vocab
+
+
+def ngram_ppl(model, tokens, n, k=1.0):
+    ctx, full, vocab = model
+    V = len(vocab)
+    toks = [t if t in vocab else &quot;&lt;unk&gt;&quot; for t in tokens]
+    padded = [&quot;&lt;s&gt;&quot;] * (n - 1) + toks + [&quot;&lt;/s&gt;&quot;]
+    nll = 0.0
+    for i in range(n - 1, len(padded)):
+        h = tuple(padded[i - n + 1:i])
+        p = (full[h + (padded[i],)] + k) / (ctx[h] + k * V)      # add-k smoothing
+        nll -= math.log(p)
+    return math.exp(nll / (len(padded) - n + 1))
+
+
+# ---------------------------------------------------------------- tests
+if __name__ == &quot;__main__&quot;:
+    torch.manual_seed(0)
+    B, T, V = 3, 12, 50
+
+    # 1: matches F.cross_entropy with ignore_index, padding handled
+    logits = torch.randn(B, T, V, dtype=torch.double)
+    ids = torch.randint(0, V, (B, T))
+    mask = torch.ones(B, T, dtype=torch.long)
+    mask[1, 8:] = 0
+    mask[2, 5:] = 0                              # right padding
+    labels = ids.clone()
+    labels[mask == 0] = -100
+    ref = F.cross_entropy(logits[:, :-1].reshape(-1, V), labels[:, 1:].reshape(-1), ignore_index=-100)
+    ours = perplexity(logits, ids, mask)
+    assert abs(ours - ref.exp().item()) &lt; 1e-9
+    print(f&quot;1. PPL from logits = {ours:.3f} == exp(F.cross_entropy) {ref.exp().item():.3f}&quot;)
+
+    # sanity values
+    uni = torch.zeros(1, T, V, dtype=torch.double)
+    assert abs(perplexity(uni, ids[:1]) - V) &lt; 1e-9
+    perfect = torch.full((1, T, V), -1e4, dtype=torch.double)
+    perfect[0, torch.arange(T - 1), ids[0, 1:]] = 1e4
+    assert abs(perplexity(perfect, ids[:1]) - 1) &lt; 1e-9
+    print(f&quot;   sanity: uniform -&gt; {V}, perfect -&gt; 1&quot;)
+
+    # 2: corpus PPL vs mean of per-sequence PPL
+    seqs = per_sequence_ppl(logits, ids, mask)
+    mean_seq = sum(seqs) / len(seqs)
+    print(f&quot;2. corpus PPL {ours:.3f} vs mean per-seq PPL {mean_seq:.3f} (different! use token-weighted)&quot;)
+    assert abs(ours - mean_seq) &gt; 1e-6
+
+    # 3: sliding window
+    N = 200
+    lm = BigramLM(V, max_len=32)
+    long_ids = torch.randint(0, V, (1, N))
+    full_ppl = math.exp(nll_sum_and_count(lm.table[long_ids], long_ids)[0].item() / (N - 1))
+    for window, stride in [(32, 16), (32, 1), (32, 31)]:
+        p, n = sliding_window_ppl(lm, long_ids, window, stride)
+        # bigram model only needs 1 token of context, so any window &gt;= 2 recovers the exact full-sequence PPL
+        assert n == N - 1 and abs(p - full_ppl) &lt; 1e-9, (window, stride, p, full_ppl)
+    print(f&quot;3. sliding window (stride 16/1/31) == full PPL {full_ppl:.3f}, every token scored once&quot;)
+    p, n = sliding_window_ppl(lm, long_ids, 32, 32)
+    assert n == N - math.ceil(N / 32)
+    print(f&quot;   disjoint chunks (stride == window): only {n}/{N - 1} tokens scored, PPL {p:.3f}&quot;)
+
+    # 4: n-gram
+    train = &quot;the cat sat on the mat the dog sat on the log&quot;.split()
+    test = &quot;the cat sat on the log&quot;.split()
+    for n in (1, 2, 3):
+        m = train_ngram(train, n)
+        print(f&quot;4. {n}-gram add-1 PPL on test: {ngram_ppl(m, test, n):.3f}&quot;)
+    m2 = train_ngram(train, 2)
+    assert ngram_ppl(m2, test, 2) &lt; ngram_ppl(train_ngram(train, 1), test, 1)
+    # add-k distribution sums to 1 for any history
+    ctx, full, vocab = m2
+    for h in [(&quot;the&quot;,), (&quot;zzz&quot;,)]:
+        s = sum((full[h + (w,)] + 1) / (ctx[h] + len(vocab)) for w in vocab)
+        assert abs(s - 1) &lt; 1e-12
+
+    # 5: bits per token / bits per byte
+    text = &quot;hello world, perplexity is exp of cross entropy&quot;
+    nll, n = nll_sum_and_count(logits, ids, mask)
+    bpt = nll.item() / n.item() / math.log(2)
+    bpb = nll.item() / math.log(2) / len(text.encode())   # pretend these tokens encode `text`
+    assert abs(2 ** bpt - ours) &lt; 1e-9
+    print(f&quot;5. bits/token {bpt:.3f} (2^bpt = PPL), bits/byte {bpb:.3f}&quot;)
     print(&quot;OK&quot;)
 </code></pre></div>
 </section>
