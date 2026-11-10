@@ -172,31 +172,31 @@
 </section>
 
 <section id="mlleetcode">
-<h2>2.9 ML 题 × LeetCode 格式（PyTorch）</h2>
+<h2>2.9 LLM 题 × LeetCode 格式（PyTorch）</h2>
 <div class="callout">别的候选人问过 recruiter：说的 "LeetCode style" 指的是<b>形式</b>，不是经典算法题。实际是给一个固定的函数签名，让你实现 ML 算子，比如 cross entropy，再用隐藏测试检查对不对。框架<b>以 PyTorch 为主</b>。</div>
 <p>规则：只能用基础 tensor 操作，题目要你实现的东西不能直接调 <code>F.xxx</code> 或 <code>nn.Xxx</code>。测试会拿 torch 官方实现来对，还会专门测边界情况。</p>
 <table>
 <tr><th>#</th><th>题目</th><th>隐藏测试最容易卡的地方</th></tr>
-<tr><td>P01</td><td>softmax / log_softmax</td><td>logit = 1000 会溢出，要先减 max；dim 参数不一定是 -1</td></tr>
-<tr><td>P02</td><td>cross_entropy</td><td>ignore_index（求 mean 时分母只算有效 token）；label_smoothing；reduction 三种</td></tr>
-<tr><td>P03</td><td>BCE with logits</td><td>logit = ±30 时要数值稳定：log σ(x) = −softplus(−x)；pos_weight</td></tr>
-<tr><td>P04</td><td>KL(P‖Q)</td><td>方向别反；<code>F.kl_div</code> 的参数顺序反直觉（input 是 log Q）</td></tr>
-<tr><td>P05</td><td>LayerNorm / RMSNorm</td><td>方差要用 <b>biased</b>（unbiased=False）</td></tr>
-<tr><td>P06</td><td>BatchNorm forward</td><td>归一化用 biased var，running_var 要用 unbiased 更新；train 和 eval 两条分支</td></tr>
-<tr><td>P07</td><td>Dropout</td><td>inverted scaling 要除以 (1−p)；eval 时原样返回；p=1</td></tr>
-<tr><td>P08</td><td>GELU（erf 和 tanh 两个版本）/ SiLU / SwiGLU</td><td>常数 0.044715，√(2/π)</td></tr>
-<tr><td>P09</td><td>scaled dot-product attention</td><td>T≠S 时 causal mask 要 <code>tril(diagonal=S−T)</code>；整行都被 mask 时会出 NaN，要处理成 0</td></tr>
-<tr><td>P10</td><td>Sinusoidal PE / RoPE</td><td>sin 放偶数维、cos 放奇数维；RoPE 要保持范数，内积只跟相对位置有关；offset</td></tr>
-<tr><td>P11</td><td>conv2d（stride、padding）</td><td>输出尺寸 (H+2p−k)//s+1；对 kernel 位置循环、其余向量化</td></tr>
-<tr><td>P12</td><td>max / avg pool</td><td>stride 默认等于 kernel size</td></tr>
-<tr><td>P13</td><td>Linear 的手写 backward</td><td>dx = dy·W，dW = dyᵀ·x，db = Σdy</td></tr>
-<tr><td>P14</td><td>AdamW 单步更新</td><td>bias correction 里的 t 从 1 开始；weight decay 是 decoupled 的</td></tr>
-<tr><td>P15</td><td>top-k / top-p 过滤</td><td>保留"累计概率 ≥ p 的最小前缀"；至少保留 top-1</td></tr>
-<tr><td>P16</td><td>CLIP / InfoNCE loss</td><td>先 L2 normalize；对称两个方向取平均</td></tr>
-<tr><td>P17</td><td>IoU 矩阵 + NMS</td><td>广播出 (N,M)；面积 clamp ≥ 0</td></tr>
-<tr><td>P18</td><td>top-k acc / confusion matrix / ROC-AUC</td><td>AUC 有 tie 时用平均 rank</td></tr>
-<tr><td>P19</td><td>EmbeddingBag</td><td>offsets 转成 bag id；空 bag 输出 0</td></tr>
-<tr><td>P20</td><td>cosine top-k 检索</td><td>归一化时 clamp eps，避免零向量除以 0</td></tr>
+<tr><td>P01</td><td>softmax / log_softmax</td><td>logit = 1000 会溢出，先减 max；dim 不一定是 -1</td></tr>
+<tr><td>P02</td><td>cross_entropy</td><td>ignore_index（mean 的分母只算有效 token）；label_smoothing；三种 reduction</td></tr>
+<tr><td>P03</td><td>causal LM loss + PPL</td><td>logits[:, :-1] 对 ids[:, 1:]；padding 和 prompt 都要 mask（SFT 只算 response）</td></tr>
+<tr><td>P04</td><td>CE 手写 backward</td><td>dlogits = (softmax − onehot) / N</td></tr>
+<tr><td>P05</td><td>LayerNorm / RMSNorm</td><td>方差用 biased；RMSNorm 不减均值、没有 bias</td></tr>
+<tr><td>P06</td><td>GELU / SiLU / SwiGLU FFN</td><td>Llama FFN：W_down(silu(xW_gate) ⊙ xW_up)</td></tr>
+<tr><td>P07</td><td>Dropout</td><td>除以 (1−p)；eval 原样返回</td></tr>
+<tr><td>P08</td><td>scaled dot-product attention</td><td>T≠S 时 causal 要 <code>tril(diagonal=S−T)</code>；整行被 mask 出 NaN → 0</td></tr>
+<tr><td>P09</td><td>RoPE / sinusoidal PE</td><td>RoPE 保持范数、内积只跟相对位置有关；offset 用绝对位置</td></tr>
+<tr><td>P10</td><td>MHA / GQA / MQA</td><td>q 头 h 用 kv 头 h // G；和 SDPA(enable_gqa) 对齐</td></tr>
+<tr><td>P11</td><td>KV cache 逐 token decode</td><td>结果必须等于 full forward；k 先加 RoPE 再进 cache</td></tr>
+<tr><td>P12</td><td>temperature / top-k / top-p</td><td>T=0 = greedy；累计概率 ≥ p 的最小前缀；至少保留 1 个</td></tr>
+<tr><td>P13</td><td>AdamW 单步</td><td>bias correction 的 t 从 1 开始；decoupled weight decay</td></tr>
+<tr><td>P14</td><td>全局 grad-norm clip + warmup-cosine</td><td>clip 的是所有参数拼起来的 norm；返回 clip 前的 norm</td></tr>
+<tr><td>P15</td><td>KL：精确值 + k1/k3 估计器</td><td>方向 KL(P‖Q)；k3 = r−1−log r 非负、无偏</td></tr>
+<tr><td>P16</td><td>序列 log-prob + DPO + Bradley-Terry</td><td>只对 response token 求和；用 softplus(−z) 写，大 margin 不溢出；policy = ref 时 DPO loss = log 2</td></tr>
+<tr><td>P17</td><td>GRPO advantage + PPO clip</td><td>组内 reward 全相同 → advantage 为 0；被 clip 的 token 没有梯度；只在 response token 上平均</td></tr>
+<tr><td>P18</td><td>MoE top-k router + 负载均衡 loss</td><td>top-k 后重新归一化 gate；aux = E·Σ f<sub>i</sub>P<sub>i</sub>，均匀时 = 1</td></tr>
+<tr><td>P19</td><td>LoRA</td><td>B 初始化为 0 → 一开始和 base 完全一样；scale = α/r；merge 后结果不变</td></tr>
+<tr><td>P20</td><td>BPE tokenizer</td><td>按训练顺序 apply merge；encode→decode 能还原，包括中文等多字节字符</td></tr>
 </table>
 <p>练习方式：先下载空白版 <a href="practice/13_ml_leetcode_torch_blank.py" download>13_ml_leetcode_torch_blank.py</a>（函数体都换成了 <code>NotImplementedError</code>，测试保持一样），自己填完跑到 <code>OK</code>，再对照答案 <a href="#c13">13</a>。每题限时 10 到 15 分钟。</p>
 </section>

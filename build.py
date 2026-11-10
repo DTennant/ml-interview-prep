@@ -17,7 +17,7 @@ TITLES = {
     "09": "System-design snippets: worker pool, UCB, bootstrap, cache, halving",
     "10": "LeetCode patterns: 16 patterns, ~35 canonical problems with tests",
     "11": "MHA + KV cache + GQA/MQA from scratch (torch)",
-    "13": "ML problems in LeetCode format (PyTorch): 20 problems, hidden tests vs torch reference",
+    "13": "LLM problems in LeetCode format (PyTorch): 20 problems, hidden tests vs torch reference",
     "12": "Perplexity: from logits, masking, corpus aggregation, sliding window, n-gram, bits/byte",
 }
 
@@ -79,7 +79,7 @@ pre code {{ background:none; padding:14px 16px !important; font-size:12.5px; lin
 <a href="#plan">1. 准备计划</a>
 <a href="#mlcoding">2. ML Coding 题库</a>
 <a class="sub" href="#leetcode">2.8 LeetCode 风格</a>
-<a class="sub" href="#mlleetcode">2.9 ML × LeetCode 格式</a>
+<a class="sub" href="#mlleetcode">2.9 LLM × LeetCode 格式</a>
 <a href="#sysdesign">3. System Design</a>
 <a href="#numbers">4. 要背熟的数字</a>
 <a href="#code">5. 代码</a>
