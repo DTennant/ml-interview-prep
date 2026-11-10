@@ -171,6 +171,36 @@
 <div class="callout">要准备的题量：上面 16 个模式、约 30 道代表题，每道能在 15–20 分钟内写出来（不用 AI、不查文档）就够了。Python 常用工具要熟：<code>collections.Counter / defaultdict / deque</code>、<code>heapq</code>（默认是最小堆，最大堆要取负）、<code>bisect</code>、<code>functools.lru_cache</code>。</div>
 </section>
 
+<section id="mlleetcode">
+<h2>2.9 ML 题 × LeetCode 格式（PyTorch）</h2>
+<div class="callout">别的候选人问过 recruiter：说的 "LeetCode style" 指的是<b>形式</b>，不是经典算法题。实际是给一个固定的函数签名，让你实现 ML 算子，比如 cross entropy，再用隐藏测试检查对不对。框架<b>以 PyTorch 为主</b>。</div>
+<p>规则：只能用基础 tensor 操作，题目要你实现的东西不能直接调 <code>F.xxx</code> 或 <code>nn.Xxx</code>。测试会拿 torch 官方实现来对，还会专门测边界情况。</p>
+<table>
+<tr><th>#</th><th>题目</th><th>隐藏测试最容易卡的地方</th></tr>
+<tr><td>P01</td><td>softmax / log_softmax</td><td>logit = 1000 会溢出，要先减 max；dim 参数不一定是 -1</td></tr>
+<tr><td>P02</td><td>cross_entropy</td><td>ignore_index（求 mean 时分母只算有效 token）；label_smoothing；reduction 三种</td></tr>
+<tr><td>P03</td><td>BCE with logits</td><td>logit = ±30 时要数值稳定：log σ(x) = −softplus(−x)；pos_weight</td></tr>
+<tr><td>P04</td><td>KL(P‖Q)</td><td>方向别反；<code>F.kl_div</code> 的参数顺序反直觉（input 是 log Q）</td></tr>
+<tr><td>P05</td><td>LayerNorm / RMSNorm</td><td>方差要用 <b>biased</b>（unbiased=False）</td></tr>
+<tr><td>P06</td><td>BatchNorm forward</td><td>归一化用 biased var，running_var 要用 unbiased 更新；train 和 eval 两条分支</td></tr>
+<tr><td>P07</td><td>Dropout</td><td>inverted scaling 要除以 (1−p)；eval 时原样返回；p=1</td></tr>
+<tr><td>P08</td><td>GELU（erf 和 tanh 两个版本）/ SiLU / SwiGLU</td><td>常数 0.044715，√(2/π)</td></tr>
+<tr><td>P09</td><td>scaled dot-product attention</td><td>T≠S 时 causal mask 要 <code>tril(diagonal=S−T)</code>；整行都被 mask 时会出 NaN，要处理成 0</td></tr>
+<tr><td>P10</td><td>Sinusoidal PE / RoPE</td><td>sin 放偶数维、cos 放奇数维；RoPE 要保持范数，内积只跟相对位置有关；offset</td></tr>
+<tr><td>P11</td><td>conv2d（stride、padding）</td><td>输出尺寸 (H+2p−k)//s+1；对 kernel 位置循环、其余向量化</td></tr>
+<tr><td>P12</td><td>max / avg pool</td><td>stride 默认等于 kernel size</td></tr>
+<tr><td>P13</td><td>Linear 的手写 backward</td><td>dx = dy·W，dW = dyᵀ·x，db = Σdy</td></tr>
+<tr><td>P14</td><td>AdamW 单步更新</td><td>bias correction 里的 t 从 1 开始；weight decay 是 decoupled 的</td></tr>
+<tr><td>P15</td><td>top-k / top-p 过滤</td><td>保留"累计概率 ≥ p 的最小前缀"；至少保留 top-1</td></tr>
+<tr><td>P16</td><td>CLIP / InfoNCE loss</td><td>先 L2 normalize；对称两个方向取平均</td></tr>
+<tr><td>P17</td><td>IoU 矩阵 + NMS</td><td>广播出 (N,M)；面积 clamp ≥ 0</td></tr>
+<tr><td>P18</td><td>top-k acc / confusion matrix / ROC-AUC</td><td>AUC 有 tie 时用平均 rank</td></tr>
+<tr><td>P19</td><td>EmbeddingBag</td><td>offsets 转成 bag id；空 bag 输出 0</td></tr>
+<tr><td>P20</td><td>cosine top-k 检索</td><td>归一化时 clamp eps，避免零向量除以 0</td></tr>
+</table>
+<p>练习方式：先下载空白版 <a href="practice/13_ml_leetcode_torch_blank.py" download>13_ml_leetcode_torch_blank.py</a>（函数体都换成了 <code>NotImplementedError</code>，测试保持一样），自己填完跑到 <code>OK</code>，再对照答案 <a href="#c13">13</a>。每题限时 10 到 15 分钟。</p>
+</section>
+
 <section id="sysdesign">
 <h2>3. System Design</h2>
 
