@@ -73,7 +73,7 @@ def causal_lm_loss(logits, input_ids, attention_mask, prompt_lens=None):
     Args:
       logits: (B, T, V) model outputs for input_ids; logits[:, t] is the prediction for token t+1.
       input_ids: (B, T) long.
-      attention_mask: (B, T) long/bool, 1 = real token, 0 = right padding.
+      attention_mask: (B, T) long/bool, 1 = real token, 0 = empty slot after the sequence ended (not a real token).
       prompt_lens: optional (B,) long. If given, tokens at positions < prompt_lens[b] are prompt and are NOT
                    trained on (SFT: loss only on the response).
     Returns: (loss, ppl) where loss = mean NLL over all counted target tokens in the whole batch (token-weighted,
@@ -155,15 +155,16 @@ def dropout(x, p, training):
 
 
 # P08 ------------------------------------------------------------------
-def sdpa(q, k, v, attn_mask=None, is_causal=False):
+def sdpa(q, k, v, attention_mask=None, is_causal=False):
     """Scaled dot-product attention: softmax(q k^T / sqrt(d) + mask) v.
 
     Args:
       q: (..., T, d) queries; k, v: (..., S, d) keys / values (leading dims, e.g. (B, H), are batch dims).
-      attn_mask: optional bool tensor broadcastable to (..., T, S); True = may attend, False = masked out.
+      attention_mask: optional bool tensor broadcastable to the score shape (..., T, S);
+                      True = this query may attend to this key, False = it may not.
       is_causal: if True, query i may only attend to keys j <= i + (S - T). When T < S (decoding with a cache)
                  the queries are the LAST T positions, so the mask is tril(ones(T, S), diagonal=S - T).
-                 If both is_causal and attn_mask are given, a key must pass both.
+                 If both is_causal and attention_mask are given, a key must pass both.
     Returns: (..., T, d).
     Edge case: a query row with every key masked must output all zeros (plain softmax over all -inf gives NaN).
     Must match F.scaled_dot_product_attention for the non-degenerate cases.
@@ -195,7 +196,7 @@ def sinusoidal_pe(T, d, base=10000.0):
 
 
 # P10 ------------------------------------------------------------------
-def multi_head_attention(x, w_qkv, b_qkv, w_o, b_o, n_heads, key_padding_mask=None, causal=False):
+def multi_head_attention(x, w_qkv, b_qkv, w_o, b_o, n_heads, attention_mask=None, causal=False):
     """Standard multi-head self-attention, matching nn.MultiheadAttention(batch_first=True) weight layout.
 
     Args:
@@ -204,8 +205,9 @@ def multi_head_attention(x, w_qkv, b_qkv, w_o, b_o, n_heads, key_padding_mask=No
              so q = x @ W_q^T + b_q, etc.  b_qkv: (3D,) packed biases.
       w_o: (D, D) output projection, b_o: (D,)  ->  out = concat_heads @ w_o^T + b_o.
       n_heads: number of heads H.
-      key_padding_mask: optional (B, T) bool, True = this KEY is padding and must not be attended to.
-      causal: if True, position i attends only to positions <= i.
+      attention_mask: optional bool tensor of shape (B, T, T) (or broadcastable to it, e.g. (T, T));
+                      attention_mask[b, i, j] = True means query i may attend to key j. Same for every head.
+      causal: if True, position i attends only to positions <= i (combined with attention_mask: must pass both).
     Steps: project -> split into heads (B, H, T, Dh) -> scaled dot-product attention per head (scale 1/sqrt(Dh))
            -> merge heads back to (B, T, D) (transpose, then reshape) -> output projection.
     Returns: (B, T, D). No dropout. You may reuse your own sdpa from P08, not F.scaled_dot_product_attention.
@@ -470,7 +472,7 @@ def test_all():
     ref = F.cross_entropy(lg[:, :-1].reshape(-1, V), lab[:, 1:].reshape(-1), ignore_index=-100)
     loss, ppl = causal_lm_loss(lg, ids, am, pl)
     close(loss, ref); close(ppl, ref.exp())
-    print("P03 causal LM loss ok (shift + pad mask + prompt mask)")
+    print("P03 causal LM loss ok (shift + empty-slot mask + prompt mask)")
 
     lgr = torch.randn(8, 5, dtype=dt, requires_grad=True); t8 = torch.randint(0, 5, (8,))
     F.cross_entropy(lgr, t8).backward()
@@ -498,9 +500,9 @@ def test_all():
     close(sdpa(q, k, v, is_causal=True),
           F.scaled_dot_product_attention(q, k, v, attn_mask=torch.ones(5, 7, dtype=torch.bool).tril(2)))
     m = torch.rand(5, 7) > 0.3; m[:, 0] = True
-    close(sdpa(q, k, v, attn_mask=m), F.scaled_dot_product_attention(q, k, v, attn_mask=m))
+    close(sdpa(q, k, v, attention_mask=m), F.scaled_dot_product_attention(q, k, v, attn_mask=m))
     m[1] = False
-    assert sdpa(q, k, v, attn_mask=m)[..., 1, :].abs().max() == 0
+    assert sdpa(q, k, v, attention_mask=m)[..., 1, :].abs().max() == 0
     print("P08 sdpa ok (causal T!=S, bool mask, fully masked row -> 0)")
 
     xr = torch.randn(2, 6, 8, dtype=dt)
@@ -511,18 +513,29 @@ def test_all():
     assert torch.allclose(sinusoidal_pe(6, 8)[0], torch.tensor([0., 1.] * 4, dtype=dt))
     print("P09 RoPE ok (norm kept, relative position, offset) / sinusoidal ok")
 
-    # P10 MHA vs nn.MultiheadAttention
+    # P10 MHA (weights from nn.MultiheadAttention) vs F.scaled_dot_product_attention reference
     D, H = 32, 8
+    Dh = D // H
     mha_ref = torch.nn.MultiheadAttention(D, H, batch_first=True, dtype=dt)
+    w_in, b_in = mha_ref.in_proj_weight.detach(), mha_ref.in_proj_bias.detach()
+    w_out, b_out = mha_ref.out_proj.weight.detach(), mha_ref.out_proj.bias.detach()
     xm_ = torch.randn(3, 7, D, dtype=dt)
-    kpm = torch.zeros(3, 7, dtype=torch.bool); kpm[1, 5:] = True; kpm[2, 2:] = True
-    args = (mha_ref.in_proj_weight.detach(), mha_ref.in_proj_bias.detach(),
-            mha_ref.out_proj.weight.detach(), mha_ref.out_proj.bias.detach(), H)
-    causal_m = torch.ones(7, 7, dtype=torch.bool).triu(1)          # nn.MHA: True = NOT allowed
-    for kp, causal in [(None, False), (kpm, False), (None, True), (kpm, True)]:
-        ref, _ = mha_ref(xm_, xm_, xm_, key_padding_mask=kp, attn_mask=causal_m if causal else None, need_weights=False)
-        close(multi_head_attention(xm_, *args, key_padding_mask=kp, causal=causal), ref.detach())
-    print("P10 MHA ok (vs nn.MultiheadAttention: plain / key padding / causal / both)")
+    am3 = torch.ones(3, 7, 7, dtype=torch.bool)                    # True = query may attend to key
+    am3[1, :, 5:] = False; am3[2, :, 2:] = False                   # seq 1 has 5 real tokens, seq 2 has 2
+    causal_ok = torch.ones(7, 7, dtype=torch.bool).tril()
+    def mha_reference(mask):
+        qr, kr, vr = (xm_ @ w_in.T + b_in).split(D, -1)
+        qr, kr, vr = (t.view(3, 7, H, Dh).transpose(1, 2) for t in (qr, kr, vr))
+        o = F.scaled_dot_product_attention(qr, kr, vr, attn_mask=None if mask is None else mask.unsqueeze(1))
+        return o.transpose(1, 2).reshape(3, 7, D) @ w_out.T + b_out
+    args = (w_in, b_in, w_out, b_out, H)
+    for am_, causal in [(None, False), (am3, False), (None, True), (am3, True)]:
+        if causal:
+            ref_mask = causal_ok.expand(3, 7, 7) if am_ is None else am_ & causal_ok
+        else:
+            ref_mask = am_
+        close(multi_head_attention(xm_, *args, attention_mask=am_, causal=causal), mha_reference(ref_mask))
+    print("P10 MHA ok (vs SDPA reference: plain / attention_mask / causal / both)")
 
     xa = torch.randn(2, 6, D, dtype=dt)
     for Hkv in (8, 2, 1):

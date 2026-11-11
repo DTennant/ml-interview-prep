@@ -10,45 +10,110 @@ import numpy as np
 
 
 class SGD:
+    """SGD with (optional) momentum and L2 weight decay, matching torch.optim.SGD.
+
+    Per parameter p with gradient g:
+        g   = g + wd * p          # L2 weight decay folded into the gradient
+        buf = mu * buf + g        # momentum buffer (velocity)
+        p   = p - lr * buf
+    With momentum=0 this is plain gradient descent.
+    Parameters are numpy arrays updated IN PLACE (so the caller's arrays change).
+    """
+
     def __init__(self, params, lr, momentum=0.0, weight_decay=0.0):
-        self.p, self.lr, self.mu, self.wd = params, lr, momentum, weight_decay
-        self.buf = [np.zeros_like(x) for x in params]
+        """params: list of numpy arrays to optimise."""
+        self.p = params
+        self.lr = lr
+        self.mu = momentum
+        self.wd = weight_decay
+
+        # One velocity buffer per parameter, same shape, starts at zero.
+        self.buf = []
+        for param in params:
+            self.buf.append(np.zeros_like(param))
 
     def step(self, grads):
-        for p, g, b in zip(self.p, grads, self.buf):
-            g = g + self.wd * p
-            b *= self.mu
-            b += g
-            p -= self.lr * b
+        """Apply one update. grads: list of arrays, same order/shapes as params."""
+        for param, grad, velocity in zip(self.p, grads, self.buf):
+            # Step 1: L2 weight decay = adding wd * p to the gradient.
+            grad_with_decay = grad + self.wd * param
+
+            # Step 2: momentum, buf = mu * buf + g (in place so self.buf stays updated).
+            velocity *= self.mu
+            velocity += grad_with_decay
+
+            # Step 3: move the parameter against the velocity (in place).
+            param -= self.lr * velocity
 
 
 class Adam:
+    """Adam (and AdamW when decoupled=True), matching torch.optim.Adam / AdamW.
+
+    Per parameter p with gradient g, at step t (starting from 1):
+        Adam  (L2):        g = g + wd * p
+        AdamW (decoupled): p = p - lr * wd * p        (decay applied directly to the weights)
+        m    = b1 * m + (1 - b1) * g                  first moment  (mean of g)
+        v    = b2 * v + (1 - b2) * g^2                second moment (mean of g^2)
+        mhat = m / (1 - b1^t)                         bias correction (m, v start at 0)
+        vhat = v / (1 - b2^t)
+        p    = p - lr * mhat / (sqrt(vhat) + eps)
+    """
+
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, decoupled=False):
-        self.p, self.lr, (self.b1, self.b2), self.eps = params, lr, betas, eps
-        self.wd, self.decoupled, self.t = weight_decay, decoupled, 0
-        self.m = [np.zeros_like(x) for x in params]
-        self.v = [np.zeros_like(x) for x in params]
+        self.p = params
+        self.lr = lr
+        self.b1 = betas[0]
+        self.b2 = betas[1]
+        self.eps = eps
+        self.wd = weight_decay
+        self.decoupled = decoupled
+        self.t = 0                       # number of steps taken so far
+
+        # First and second moment estimates, one per parameter, start at zero.
+        self.m = []
+        self.v = []
+        for param in params:
+            self.m.append(np.zeros_like(param))
+            self.v.append(np.zeros_like(param))
 
     def step(self, grads):
+        """Apply one Adam/AdamW update to every parameter (in place)."""
         self.t += 1
-        for p, g, m, v in zip(self.p, grads, self.m, self.v):
+        bias_correction1 = 1 - self.b1 ** self.t
+        bias_correction2 = 1 - self.b2 ** self.t
+
+        for param, grad, m, v in zip(self.p, grads, self.m, self.v):
+            # Step 1: weight decay. The two variants differ ONLY here.
             if self.decoupled:
-                p -= self.lr * self.wd * p            # AdamW
+                # AdamW: shrink weights directly; NOT rescaled by 1/sqrt(v).
+                param -= self.lr * self.wd * param
             else:
-                g = g + self.wd * p                   # L2 (Adam)
-            m[:] = self.b1 * m + (1 - self.b1) * g
-            v[:] = self.b2 * v + (1 - self.b2) * g * g
-            mhat = m / (1 - self.b1 ** self.t)
-            vhat = v / (1 - self.b2 ** self.t)
-            p -= self.lr * mhat / (np.sqrt(vhat) + self.eps)
+                # Adam + L2: decay goes through the gradient, so it gets rescaled by Adam.
+                grad = grad + self.wd * param
+
+            # Step 2: update the running moments (m[:] = ... writes into the stored buffer).
+            m[:] = self.b1 * m + (1 - self.b1) * grad
+            v[:] = self.b2 * v + (1 - self.b2) * grad * grad
+
+            # Step 3: bias correction. Early on m, v are biased towards 0 because they start at 0.
+            m_hat = m / bias_correction1
+            v_hat = v / bias_correction2
+
+            # Step 4: per-coordinate adaptive step: big where grads are consistent, small where noisy.
+            update = m_hat / (np.sqrt(v_hat) + self.eps)
+            param -= self.lr * update
 
 
 def AdamW(params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-2):
+    """AdamW = Adam with decoupled weight decay (default wd = 0.01, like torch)."""
     return Adam(params, lr, betas, eps, weight_decay, decoupled=True)
 
 
 def quad_grad(w, A, b):
-    """loss = 0.5 w^T A w - b^T w -> grad = A w - b"""
+    """Gradient of the quadratic loss = 0.5 w^T A w - b^T w  (A symmetric).
+
+    grad = A w - b. Input w (n,), A (n, n), b (n,). Output (n,).
+    """
     return A @ w - b
 
 

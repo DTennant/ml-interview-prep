@@ -28,7 +28,7 @@
 <table>
 <tr><th>时间</th><th>ML Coding</th><th>System Design</th></tr>
 <tr><td>Day 1</td><td>MLP + softmax/CE + grad check（01）；LayerNorm/BatchNorm backward（02）</td><td>画一张自己做过的系统的架构图，15 分钟能讲清楚（只讲 high-level）</td></tr>
-<tr><td>Day 2</td><td>Attention + causal/padding mask（03）；GPT block + RoPE + KV cache + sampling（04）；MHA + KV cache + GQA（11）</td><td>Mock：自我改进 / 自动化 ML 实验 agent 系统（题 A）</td></tr>
+<tr><td>Day 2</td><td>Attention + causal mask / attention_mask（03）；GPT block + RoPE + KV cache + sampling（04）；MHA + KV cache + GQA（11）</td><td>Mock：自我改进 / 自动化 ML 实验 agent 系统（题 A）</td></tr>
 <tr><td>Day 3</td><td>Optimizers（05）；Debug 题（06）；经典 ML（07）；LeetCode 模式 1–8（10）</td><td>Mock：大规模 agent eval / rollout 平台（题 B）</td></tr>
 <tr><td>Day 4</td><td>RL losses：REINFORCE / GAE / PPO / GRPO（08）；LeetCode 模式 9–16（10）</td><td>Mock：agent RL 训练 pipeline（题 C）+ 推理服务（题 D）</td></tr>
 <tr><td>面试前一天</td><td>不看答案，从空白 Colab 重写 03 + 04 + 11，计时 30 分钟</td><td>写一遍 09 里的 worker pool / bandit / bootstrap；背 §4 的数字</td></tr>
@@ -44,7 +44,7 @@
 <tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
 <tr><td>numpy 手写 MLP forward + backward，gradient check 验证</td><td>链式法则、每个矩阵的 shape、ReLU 的 backward、centered finite difference</td><td><a href="#c01">01</a></td></tr>
 <tr><td>softmax + cross-entropy</td><td>减掉每行最大值（log-sum-exp）；梯度 = (softmax − onehot)/N</td><td><a href="#c01">01</a></td></tr>
-<tr><td>self-attention / multi-head attention</td><td>除以 √d_head；mask 要在 softmax 之前加；causal 和 padding mask 怎么组合；(B,T,D)→(B,H,T,Dh) 的 reshape/transpose</td><td><a href="#c03">03</a></td></tr>
+<tr><td>self-attention / multi-head attention</td><td>除以 √d_head；mask 要在 softmax 之前加；causal mask 和 attention_mask 用 &amp; 组合（True = 可以 attend）；(B,T,D)→(B,H,T,Dh) 的 reshape/transpose</td><td><a href="#c03">03</a></td></tr>
 <tr><td><b>KV cache + GQA / MQA</b>（高频，有公司要求一小时内连 MHA 一起写完）</td><td>预分配 cache (B,Hkv,max_T,Dh) + 写入位置；prefill 和 decode；带 cache 时 causal mask 要对齐到末尾：tril(diagonal=S−T)；RoPE 用绝对位置，在写入 cache 之前作用到 k；GQA 把 q reshape 成 (B,Hkv,G,T,Dh)，k/v 广播，不用复制；repeat_interleave 也行，但会多存 G 份 K/V；cache 大小 = 2·L·Hkv·Dh·bytes/token，GQA 缩小 H/Hkv 倍</td><td><a href="#c11">11</a></td></tr>
 <tr><td>Transformer block</td><td>pre-norm vs post-norm；残差；MLP 4× 扩展；SwiGLU</td><td><a href="#c04">04</a></td></tr>
 <tr><td>位置编码：sinusoidal / RoPE</td><td>RoPE 是对 q、k 两两维度做旋转；只作用在 q、k 上，不作用在 v 上；使用 KV cache 时 position offset 要对</td><td><a href="#c04">04</a></td></tr>
@@ -186,7 +186,7 @@
 <tr><td>P07</td><td>Dropout</td><td>除以 (1−p)；eval 原样返回</td></tr>
 <tr><td>P08</td><td>scaled dot-product attention</td><td>T≠S 时 causal 要 <code>tril(diagonal=S−T)</code>；整行被 mask 出 NaN → 0</td></tr>
 <tr><td>P09</td><td>RoPE / sinusoidal PE</td><td>RoPE 保持范数、内积只跟相对位置有关；offset 用绝对位置</td></tr>
-<tr><td>P10</td><td>Multi-head attention</td><td>packed in_proj (3D, D) 按 q/k/v 拆；split heads → (B,H,T,Dh)，merge 时先 transpose 再 reshape；key_padding_mask 遮的是 key 列；和 nn.MultiheadAttention 对齐</td></tr>
+<tr><td>P10</td><td>Multi-head attention</td><td>packed in_proj (3D, D) 按 q/k/v 拆；split heads → (B,H,T,Dh)，merge 时先 transpose 再 reshape；attention_mask (B,T,T) 加一个 head 维 broadcast，True = 可以 attend；和 nn.MultiheadAttention 对齐</td></tr>
 <tr><td>P11</td><td>GQA / MQA</td><td>q 头 h 用 kv 头 h // G；和 SDPA(enable_gqa) 对齐</td></tr>
 <tr><td>P12</td><td>KV cache 逐 token decode</td><td>结果必须等于 full forward；k 先加 RoPE 再进 cache</td></tr>
 <tr><td>P13</td><td>temperature / top-k / top-p</td><td>T=0 = greedy；累计概率 ≥ p 的最小前缀；至少保留 1 个</td></tr>

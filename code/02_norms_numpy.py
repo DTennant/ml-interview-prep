@@ -9,74 +9,227 @@ import numpy as np
 
 
 def layernorm_forward(x, gamma, beta, eps=1e-5):
-    mu = x.mean(-1, keepdims=True)
-    var = x.var(-1, keepdims=True)
-    inv = 1.0 / np.sqrt(var + eps)
-    xhat = (x - mu) * inv
-    return xhat * gamma + beta, (xhat, inv, gamma)
+    """LayerNorm forward: normalise each token over its last (feature) dim.
+
+    Input:  x (..., D), gamma (D,), beta (D,)
+    Output: y (..., D), cache for backward
+
+    Formula:
+        mu    = mean(x, last dim)
+        var   = mean((x - mu)^2, last dim)
+        xhat  = (x - mu) / sqrt(var + eps)
+        y     = gamma * xhat + beta
+    """
+    # Step 1: per-token mean and variance over the feature dim.
+    mu = x.mean(axis=-1, keepdims=True)                 # (..., 1)
+    var = x.var(axis=-1, keepdims=True)                 # (..., 1)
+
+    # Step 2: 1 / std. Kept separately because backward needs it.
+    inv_std = 1.0 / np.sqrt(var + eps)                  # (..., 1)
+
+    # Step 3: normalise -> zero mean, unit variance per token.
+    x_centered = x - mu                                 # (..., D)
+    xhat = x_centered * inv_std                         # (..., D)
+
+    # Step 4: learnable scale and shift.
+    y = xhat * gamma + beta                             # (..., D)
+
+    cache = (xhat, inv_std, gamma)
+    return y, cache
 
 
 def layernorm_backward(dy, cache):
-    xhat, inv, gamma = cache
-    dgamma = (dy * xhat).reshape(-1, xhat.shape[-1]).sum(0)
-    dbeta = dy.reshape(-1, dy.shape[-1]).sum(0)
-    g = dy * gamma
-    dx = inv * (g - g.mean(-1, keepdims=True) - xhat * (g * xhat).mean(-1, keepdims=True))
+    """LayerNorm backward.
+
+    Input:  dy (..., D) upstream gradient, cache from layernorm_forward
+    Output: dx (..., D), dgamma (D,), dbeta (D,)
+
+    Formulas:
+        dbeta  = sum over all tokens of dy
+        dgamma = sum over all tokens of dy * xhat
+        g      = dy * gamma                                  (grad w.r.t. xhat)
+        dx     = inv_std * (g - mean(g) - xhat * mean(g * xhat))   means over last dim
+    The two mean terms come from mu and var both depending on every x_j in the token.
+    """
+    xhat, inv_std, gamma = cache
+    D = xhat.shape[-1]
+
+    # Step 1: parameter gradients. gamma/beta are shared by every token, so we sum
+    # over all leading dims (flatten them into one "token" axis first).
+    dy_flat = dy.reshape(-1, D)                         # (num_tokens, D)
+    xhat_flat = xhat.reshape(-1, D)                     # (num_tokens, D)
+    dgamma = (dy_flat * xhat_flat).sum(axis=0)          # (D,)
+    dbeta = dy_flat.sum(axis=0)                         # (D,)
+
+    # Step 2: gradient w.r.t. xhat (y = gamma * xhat + beta  ->  dL/dxhat = dy * gamma).
+    g = dy * gamma                                      # (..., D)
+
+    # Step 3: gradient through the normalisation.
+    # - mean(g) term: removes the part of g that would just shift the mean (from d mu).
+    # - xhat * mean(g * xhat) term: removes the part that would change the variance (from d var).
+    g_mean = g.mean(axis=-1, keepdims=True)                     # (..., 1)
+    g_dot_xhat_mean = (g * xhat).mean(axis=-1, keepdims=True)   # (..., 1)
+    dx = inv_std * (g - g_mean - xhat * g_dot_xhat_mean)        # (..., D)
+
     return dx, dgamma, dbeta
 
 
 def rmsnorm_forward(x, gamma, eps=1e-6):
-    rms = np.sqrt((x * x).mean(-1, keepdims=True) + eps)
-    xhat = x / rms
-    return xhat * gamma, (xhat, rms, gamma)
+    """RMSNorm forward: like LayerNorm but no mean subtraction and no beta.
+
+    Input:  x (..., D), gamma (D,)
+    Output: y (..., D), cache
+
+    Formula:
+        rms  = sqrt(mean(x^2, last dim) + eps)
+        xhat = x / rms
+        y    = gamma * xhat
+    """
+    # Step 1: root-mean-square over the feature dim.
+    mean_square = (x * x).mean(axis=-1, keepdims=True)  # (..., 1)
+    rms = np.sqrt(mean_square + eps)                    # (..., 1)
+
+    # Step 2: rescale (no centering!).
+    xhat = x / rms                                      # (..., D)
+
+    # Step 3: learnable scale.
+    y = xhat * gamma                                    # (..., D)
+
+    cache = (xhat, rms, gamma)
+    return y, cache
 
 
 def rmsnorm_backward(dy, cache):
+    """RMSNorm backward.
+
+    Input:  dy (..., D), cache from rmsnorm_forward
+    Output: dx (..., D), dgamma (D,)
+
+    Formulas:
+        dgamma = sum over all tokens of dy * xhat
+        g      = dy * gamma
+        dx     = (g - xhat * mean(g * xhat)) / rms
+    Same as LayerNorm minus the mean(g) term, because there is no mean subtraction.
+    """
     xhat, rms, gamma = cache
-    dgamma = (dy * xhat).reshape(-1, xhat.shape[-1]).sum(0)
-    g = dy * gamma
-    dx = (g - xhat * (g * xhat).mean(-1, keepdims=True)) / rms
+    D = xhat.shape[-1]
+
+    # Step 1: gamma gradient, summed over every token.
+    dy_flat = dy.reshape(-1, D)                         # (num_tokens, D)
+    xhat_flat = xhat.reshape(-1, D)                     # (num_tokens, D)
+    dgamma = (dy_flat * xhat_flat).sum(axis=0)          # (D,)
+
+    # Step 2: gradient w.r.t. xhat.
+    g = dy * gamma                                      # (..., D)
+
+    # Step 3: through xhat = x / rms. rms depends on all x_j, which gives the
+    # projection term xhat * mean(g * xhat).
+    g_dot_xhat_mean = (g * xhat).mean(axis=-1, keepdims=True)   # (..., 1)
+    dx = (g - xhat * g_dot_xhat_mean) / rms                     # (..., D)
+
     return dx, dgamma
 
 
 class BatchNorm1d:
-    def __init__(self, d, momentum=0.1, eps=1e-5):
-        self.gamma, self.beta = np.ones(d), np.zeros(d)
-        self.running_mean, self.running_var = np.zeros(d), np.ones(d)
-        self.m, self.eps, self.training = momentum, eps, True
+    """BatchNorm over a (N, D) batch: normalise each feature across the batch.
 
-    def forward(self, x):                      # x: (N, D)
+    Training: uses the batch mean/var and updates running estimates.
+    Eval:     uses the running mean/var (so output doesn't depend on the batch).
+    """
+
+    def __init__(self, d, momentum=0.1, eps=1e-5):
+        """d = number of features. momentum = weight of the new batch in the running average."""
+        # Learnable scale and shift, one per feature.
+        self.gamma = np.ones(d)                         # (D,)
+        self.beta = np.zeros(d)                         # (D,)
+
+        # Running statistics used at inference time.
+        self.running_mean = np.zeros(d)                 # (D,)
+        self.running_var = np.ones(d)                   # (D,)
+
+        self.m = momentum
+        self.eps = eps
+        self.training = True
+
+    def forward(self, x):
+        """Forward pass.
+
+        Input:  x (N, D)
+        Output: y (N, D) = gamma * (x - mu) / sqrt(var + eps) + beta
+        """
         if self.training:
-            mu, var = x.mean(0), x.var(0)
+            # Step 1a: statistics of THIS batch, per feature (reduce over axis 0 = batch).
+            mu = x.mean(axis=0)                         # (D,)
+            var = x.var(axis=0)                         # (D,)  biased (divide by N)
             n = x.shape[0]
+
+            # Step 1b: update running averages for inference.
+            # PyTorch stores the UNBIASED variance (divide by N-1) in running_var.
+            unbiased_var = var * n / (n - 1)            # (D,)
             self.running_mean = (1 - self.m) * self.running_mean + self.m * mu
-            self.running_var = (1 - self.m) * self.running_var + self.m * var * n / (n - 1)  # unbiased
+            self.running_var = (1 - self.m) * self.running_var + self.m * unbiased_var
         else:
-            mu, var = self.running_mean, self.running_var
-        inv = 1 / np.sqrt(var + self.eps)
-        xhat = (x - mu) * inv
-        self.cache = (xhat, inv)
-        return xhat * self.gamma + self.beta
+            # Step 1 (eval): use the stored running statistics.
+            mu = self.running_mean                      # (D,)
+            var = self.running_var                      # (D,)
+
+        # Step 2: normalise.
+        inv_std = 1 / np.sqrt(var + self.eps)           # (D,)
+        xhat = (x - mu) * inv_std                       # (N, D)
+
+        # Step 3: scale and shift.
+        y = xhat * self.gamma + self.beta               # (N, D)
+
+        self.cache = (xhat, inv_std)
+        return y
 
     def backward(self, dy):
-        xhat, inv = self.cache
-        self.dgamma = (dy * xhat).sum(0)
-        self.dbeta = dy.sum(0)
-        g = dy * self.gamma
-        return inv * (g - g.mean(0) - xhat * (g * xhat).mean(0))
+        """Backward pass (training mode).
+
+        Input:  dy (N, D)
+        Output: dx (N, D); also sets self.dgamma (D,), self.dbeta (D,)
+
+        Same compact formula as LayerNorm, but the means are over the BATCH axis (0):
+            g  = dy * gamma
+            dx = inv_std * (g - mean_N(g) - xhat * mean_N(g * xhat))
+        """
+        xhat, inv_std = self.cache
+
+        # Step 1: parameter gradients (sum over the batch).
+        self.dgamma = (dy * xhat).sum(axis=0)           # (D,)
+        self.dbeta = dy.sum(axis=0)                     # (D,)
+
+        # Step 2: gradient w.r.t. xhat.
+        g = dy * self.gamma                             # (N, D)
+
+        # Step 3: through the batch mean and batch variance.
+        g_mean = g.mean(axis=0)                         # (D,)
+        g_dot_xhat_mean = (g * xhat).mean(axis=0)       # (D,)
+        dx = inv_std * (g - g_mean - xhat * g_dot_xhat_mean)    # (N, D)
+        return dx
 
 
 def numgrad(f, x, eps=1e-6):
-    g = np.zeros_like(x)
-    it = np.nditer(x, flags=["multi_index"])
-    for _ in it:
-        i = it.multi_index
-        old = x[i]
-        x[i] = old + eps; fp = f()
-        x[i] = old - eps; fm = f()
-        x[i] = old
-        g[i] = (fp - fm) / (2 * eps)
-    return g
+    """Numerical gradient of a scalar function f() w.r.t. array x (modified in place).
+
+    For every element: grad[i] = (f(x + eps e_i) - f(x - eps e_i)) / (2 eps)
+    Output has the same shape as x.
+    """
+    grad = np.zeros_like(x)
+    iterator = np.nditer(x, flags=["multi_index"])
+    for _ in iterator:
+        i = iterator.multi_index
+        original_value = x[i]
+
+        x[i] = original_value + eps
+        f_plus = f()
+
+        x[i] = original_value - eps
+        f_minus = f()
+
+        x[i] = original_value                           # restore
+        grad[i] = (f_plus - f_minus) / (2 * eps)
+    return grad
 
 
 if __name__ == "__main__":
