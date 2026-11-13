@@ -95,6 +95,25 @@
 <li>大语料累加 NLL 用 float64，避免精度损失</li>
 </ul>
 
+<h3 id="onlineentropy">2.3c Online entropy / online softmax</h3>
+<p>题目：vocab 很大（比如 150k），logits 分块读进来，要求只扫一遍、不存整个概率分布，算出 softmax 的 entropy。思路和 FlashAttention 里的 online softmax 一样。</p>
+<p><b>推导</b>：p<sub>i</sub> = exp(x<sub>i</sub>) / Z，所以 H = −Σ p<sub>i</sub> log p<sub>i</sub> = −Σ p<sub>i</sub>(x<sub>i</sub> − log Z) = <b>log Z − E<sub>p</sub>[x]</b>。每行只需要维护三个量：</p>
+<ul>
+<li><code>m</code>：目前见过的最大 logit（数值稳定用）</li>
+<li><code>s = Σ exp(x<sub>i</sub> − m)</code>：归一化项</li>
+<li><code>t = Σ exp(x<sub>i</sub> − m) · x<sub>i</sub></code>：没归一化的 x 加权和</li>
+</ul>
+<p>最后 log Z = m + log s，E<sub>p</sub>[x] = t / s，所以 <b>H = m + log s − t / s</b>。每来一个新 chunk，如果最大值从 m 变成 m<sub>new</sub>，旧的 s 和 t 都乘上 exp(m − m<sub>new</sub>)（x<sub>i</sub> 本身不变，所以 t 和 s 用同一个缩放系数），再加上新 chunk 的贡献。</p>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>online logsumexp</td><td>只维护 (m, s)；初始 m = −inf、s = 0；最大值变了要 rescale</td><td><a href="#c14">14</a></td></tr>
+<tr><td>online entropy</td><td>多维护一个 t；H = m + log s − t/s；和 <code>-(softmax * log_softmax).sum(-1)</code> 对齐；logits ≈ 1000 时也不溢出</td><td><a href="#c14">14</a></td></tr>
+<tr><td>online cross entropy</td><td>CE = logsumexp(x) − x<sub>target</sub>；target logit 在它所在的那个 chunk 里用 gather 取出来</td><td><a href="#c14">14</a></td></tr>
+<tr><td>vocab 切到多张卡</td><td>每张卡算自己那段的 (m, s, t)，合并时都 rescale 到两者中较大的 max 再相加；合并满足结合律，可以做 tree reduction / all-reduce</td><td><a href="#c14">14</a></td></tr>
+<tr><td>样本流的经验 entropy</td><td>维护 counts、N 和 S = Σ n<sub>c</sub> log n<sub>c</sub>；H = log N − S/N；每来一个样本只更新它那一项，O(1)</td><td><a href="#c14">14</a></td></tr>
+</table>
+<p>常见追问：为什么要减 max（float32 下 exp(x) 在 x &gt; 88 左右就溢出）；复杂度（时间 O(V)，每行额外内存 O(1)）；整段都被 mask 成 −inf 时 −inf − (−inf) = nan，要用 −1e9 之类的大负数代替；bf16 的 logits 也要用 float32 累加。</p>
+
 <h3>2.4 Debug 题</h3>
 <p>给一段训练代码，问 loss 为什么不降或者变成 NaN。常见埋的 bug：</p>
 <ul class="cols2">

@@ -44,12 +44,13 @@ pre code { background:none; padding:14px 16px !important; font-size:12.5px; line
 <a href="#overview">0. 面试形式</a>
 <a href="#plan">1. 准备计划</a>
 <a href="#mlcoding">2. ML Coding 题库</a>
+<a class="sub" href="#onlineentropy">2.3c Online entropy</a>
 <a class="sub" href="#leetcode">2.8 LeetCode 风格</a>
 <a class="sub" href="#mlleetcode">2.9 LLM × LeetCode 格式</a>
 <a href="#sysdesign">3. System Design</a>
 <a href="#numbers">4. 要背熟的数字</a>
 <a href="#code">5. 代码</a>
-<a class="sub" href="#c01">01_mlp_numpy.py</a><a class="sub" href="#c02">02_norms_numpy.py</a><a class="sub" href="#c03">03_attention_numpy.py</a><a class="sub" href="#c04">04_gpt_torch.py</a><a class="sub" href="#c05">05_optimizers_numpy.py</a><a class="sub" href="#c06">06_debug_training.py</a><a class="sub" href="#c07">07_classic_ml_numpy.py</a><a class="sub" href="#c08">08_rl_losses_torch.py</a><a class="sub" href="#c09">09_sysdesign_snippets.py</a><a class="sub" href="#c10">10_leetcode_patterns.py</a><a class="sub" href="#c11">11_mha_kvcache_gqa.py</a><a class="sub" href="#c12">12_perplexity.py</a><a class="sub" href="#c13">13_ml_leetcode_torch.py</a>
+<a class="sub" href="#c01">01_mlp_numpy.py</a><a class="sub" href="#c02">02_norms_numpy.py</a><a class="sub" href="#c03">03_attention_numpy.py</a><a class="sub" href="#c04">04_gpt_torch.py</a><a class="sub" href="#c05">05_optimizers_numpy.py</a><a class="sub" href="#c06">06_debug_training.py</a><a class="sub" href="#c07">07_classic_ml_numpy.py</a><a class="sub" href="#c08">08_rl_losses_torch.py</a><a class="sub" href="#c09">09_sysdesign_snippets.py</a><a class="sub" href="#c10">10_leetcode_patterns.py</a><a class="sub" href="#c11">11_mha_kvcache_gqa.py</a><a class="sub" href="#c12">12_perplexity.py</a><a class="sub" href="#c13">13_ml_leetcode_torch.py</a><a class="sub" href="#c14">14_online_entropy.py</a>
 </nav>
 <main>
 <h1 style="margin-top:0">ML Coding &amp; System Design 面试准备</h1>
@@ -150,6 +151,25 @@ pre code { background:none; padding:14px 16px !important; font-size:12.5px; line
 <li>PPL 低不等于生成好：不反映事实性、指令遵循、多样性；对 RLHF/对齐后的模型 PPL 通常会变高</li>
 <li>大语料累加 NLL 用 float64，避免精度损失</li>
 </ul>
+
+<h3 id="onlineentropy">2.3c Online entropy / online softmax</h3>
+<p>题目：vocab 很大（比如 150k），logits 分块读进来，要求只扫一遍、不存整个概率分布，算出 softmax 的 entropy。思路和 FlashAttention 里的 online softmax 一样。</p>
+<p><b>推导</b>：p<sub>i</sub> = exp(x<sub>i</sub>) / Z，所以 H = −Σ p<sub>i</sub> log p<sub>i</sub> = −Σ p<sub>i</sub>(x<sub>i</sub> − log Z) = <b>log Z − E<sub>p</sub>[x]</b>。每行只需要维护三个量：</p>
+<ul>
+<li><code>m</code>：目前见过的最大 logit（数值稳定用）</li>
+<li><code>s = Σ exp(x<sub>i</sub> − m)</code>：归一化项</li>
+<li><code>t = Σ exp(x<sub>i</sub> − m) · x<sub>i</sub></code>：没归一化的 x 加权和</li>
+</ul>
+<p>最后 log Z = m + log s，E<sub>p</sub>[x] = t / s，所以 <b>H = m + log s − t / s</b>。每来一个新 chunk，如果最大值从 m 变成 m<sub>new</sub>，旧的 s 和 t 都乘上 exp(m − m<sub>new</sub>)（x<sub>i</sub> 本身不变，所以 t 和 s 用同一个缩放系数），再加上新 chunk 的贡献。</p>
+<table>
+<tr><th>题目</th><th>面试官盯的点</th><th>代码</th></tr>
+<tr><td>online logsumexp</td><td>只维护 (m, s)；初始 m = −inf、s = 0；最大值变了要 rescale</td><td><a href="#c14">14</a></td></tr>
+<tr><td>online entropy</td><td>多维护一个 t；H = m + log s − t/s；和 <code>-(softmax * log_softmax).sum(-1)</code> 对齐；logits ≈ 1000 时也不溢出</td><td><a href="#c14">14</a></td></tr>
+<tr><td>online cross entropy</td><td>CE = logsumexp(x) − x<sub>target</sub>；target logit 在它所在的那个 chunk 里用 gather 取出来</td><td><a href="#c14">14</a></td></tr>
+<tr><td>vocab 切到多张卡</td><td>每张卡算自己那段的 (m, s, t)，合并时都 rescale 到两者中较大的 max 再相加；合并满足结合律，可以做 tree reduction / all-reduce</td><td><a href="#c14">14</a></td></tr>
+<tr><td>样本流的经验 entropy</td><td>维护 counts、N 和 S = Σ n<sub>c</sub> log n<sub>c</sub>；H = log N − S/N；每来一个样本只更新它那一项，O(1)</td><td><a href="#c14">14</a></td></tr>
+</table>
+<p>常见追问：为什么要减 max（float32 下 exp(x) 在 x &gt; 88 左右就溢出）；复杂度（时间 O(V)，每行额外内存 O(1)）；整段都被 mask 成 −inf 时 −inf − (−inf) = nan，要用 −1e9 之类的大负数代替；bf16 的 logits 也要用 float32 累加。</p>
 
 <h3>2.4 Debug 题</h3>
 <p>给一段训练代码，问 loss 为什么不降或者变成 NaN。常见埋的 bug：</p>
@@ -363,7 +383,7 @@ pre code { background:none; padding:14px 16px !important; font-size:12.5px; line
 <section id="code">
 <h2>5. 代码</h2>
 <p>在本地或 Colab 运行：<code>pip install numpy torch</code>，然后 <code>python 01_mlp_numpy.py</code>。建议先自己从空白写一遍，再来对照。</p>
-<ul><li><a href="#c01">01_mlp_numpy.py</a> — MLP + softmax/CE + grad check (numpy)</li><li><a href="#c02">02_norms_numpy.py</a> — LayerNorm / RMSNorm / BatchNorm backward (numpy)</li><li><a href="#c03">03_attention_numpy.py</a> — Multi-head attention + masks (numpy)</li><li><a href="#c04">04_gpt_torch.py</a> — Mini GPT: RoPE, KV cache, sampling, AdamW, warmup/cosine (torch)</li><li><a href="#c05">05_optimizers_numpy.py</a> — SGD / Adam / AdamW from scratch (numpy, vs torch)</li><li><a href="#c06">06_debug_training.py</a> — Debug drill: buggy vs fixed training loop (torch)</li><li><a href="#c07">07_classic_ml_numpy.py</a> — Classic ML: logreg, k-means, PCA, kNN, conv2d im2col (numpy)</li><li><a href="#c08">08_rl_losses_torch.py</a> — RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)</li><li><a href="#c09">09_sysdesign_snippets.py</a> — System-design snippets: worker pool, UCB, bootstrap, cache, halving</li><li><a href="#c10">10_leetcode_patterns.py</a> — LeetCode patterns: 16 patterns, ~35 canonical problems with tests</li><li><a href="#c11">11_mha_kvcache_gqa.py</a> — MHA + KV cache + GQA/MQA from scratch (torch)</li><li><a href="#c12">12_perplexity.py</a> — Perplexity: from logits, masking, corpus aggregation, sliding window, n-gram, bits/byte</li><li><a href="#c13">13_ml_leetcode_torch.py</a> — LLM problems in LeetCode format (PyTorch): 21 problems, hidden tests vs torch reference</li></ul>
+<ul><li><a href="#c01">01_mlp_numpy.py</a> — MLP + softmax/CE + grad check (numpy)</li><li><a href="#c02">02_norms_numpy.py</a> — LayerNorm / RMSNorm / BatchNorm backward (numpy)</li><li><a href="#c03">03_attention_numpy.py</a> — Multi-head attention + masks (numpy)</li><li><a href="#c04">04_gpt_torch.py</a> — Mini GPT: RoPE, KV cache, sampling, AdamW, warmup/cosine (torch)</li><li><a href="#c05">05_optimizers_numpy.py</a> — SGD / Adam / AdamW from scratch (numpy, vs torch)</li><li><a href="#c06">06_debug_training.py</a> — Debug drill: buggy vs fixed training loop (torch)</li><li><a href="#c07">07_classic_ml_numpy.py</a> — Classic ML: logreg, k-means, PCA, kNN, conv2d im2col (numpy)</li><li><a href="#c08">08_rl_losses_torch.py</a> — RL losses: REINFORCE, GAE, PPO, GRPO, k3 KL (torch)</li><li><a href="#c09">09_sysdesign_snippets.py</a> — System-design snippets: worker pool, UCB, bootstrap, cache, halving</li><li><a href="#c10">10_leetcode_patterns.py</a> — LeetCode patterns: 16 patterns, ~35 canonical problems with tests</li><li><a href="#c11">11_mha_kvcache_gqa.py</a> — MHA + KV cache + GQA/MQA from scratch (torch)</li><li><a href="#c12">12_perplexity.py</a> — Perplexity: from logits, masking, corpus aggregation, sliding window, n-gram, bits/byte</li><li><a href="#c13">13_ml_leetcode_torch.py</a> — LLM problems in LeetCode format (PyTorch): 21 problems, hidden tests vs torch reference</li><li><a href="#c14">14_online_entropy.py</a> — Online entropy / logsumexp / cross-entropy over vocab chunks, shard merging, streaming empirical entropy (torch)</li></ul>
 <div class="codeblock" id="c01">
 <div class="codehead"><span>01_mlp_numpy.py — MLP + softmax/CE + grad check (numpy)</span>
 <span><a href="code/01_mlp_numpy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
@@ -6068,6 +6088,278 @@ def test_all():
 
 if __name__ == &quot;__main__&quot;:
     test_all()
+</code></pre></div><div class="codeblock" id="c14">
+<div class="codehead"><span>14_online_entropy.py — Online entropy / logsumexp / cross-entropy over vocab chunks, shard merging, streaming empirical entropy (torch)</span>
+<span><a href="code/14_online_entropy.py" download>download</a> · <button onclick="copyCode(this)">copy</button></span></div>
+<pre><code class="language-python">&quot;&quot;&quot;Online (streaming / chunked) entropy, logsumexp and cross-entropy, with tests.
+
+Problem: the vocab V is huge (e.g. 150k) and the logits come in chunks (or we do not want to
+materialise the full softmax). Compute in ONE pass over the logits, with O(1) extra memory per row:
+  1. logsumexp(x)                      -- the &quot;online softmax&quot; trick (same as in FlashAttention)
+  2. entropy of softmax(x)             -- H = logsumexp(x) - E_p[x]
+  3. cross-entropy for a target index  -- CE = logsumexp(x) - x[target]
+  4. merging two partial states        -- lets you split the vocab across threads / GPUs (vocab parallel)
+  5. bonus: entropy of an empirical distribution from a stream of samples (counts), O(1) per update
+
+Derivation for the entropy:
+    p_i = exp(x_i) / Z,   Z = sum_j exp(x_j),   log Z = logsumexp(x)
+    H   = -sum_i p_i log p_i
+        = -sum_i p_i (x_i - log Z)
+        = log Z - sum_i p_i x_i
+So we only need three running numbers per row:
+    m = max logit seen so far                      (for numerical stability)
+    s = sum_i exp(x_i - m)                         (normaliser, relative to m)
+    t = sum_i exp(x_i - m) * x_i                   (unnormalised weighted sum of logits)
+and at the end:
+    log Z       = m + log(s)
+    E_p[x]      = t / s
+    H           = m + log(s) - t / s
+
+When the running max changes from m_old to m_new, every old term exp(x_i - m_old) has to become
+exp(x_i - m_new) = exp(x_i - m_old) * exp(m_old - m_new). So both s and t are multiplied by the
+same factor exp(m_old - m_new). (x_i itself does not change, so t uses the same rescale as s.)
+
+Interview checklist:
+- why subtract the max: exp(x) overflows for x &gt; ~88 in float32; after subtracting the max all exponents are &lt;= 0
+- start with m = -inf, s = t = 0; exp(-inf - m_new) = 0 so the first rescale is a no-op. Edge case: if every logit seen
+  so far is -inf (fully masked), -inf - (-inf) = nan; replace -inf by a large negative number like -1e9 to avoid it
+- complexity: time O(V), extra memory O(1) per row (never stores the V-dim probabilities)
+- accumulate in float32 even if logits are bf16
+- states are associative to merge -&gt; tree reduction, or one partial state per GPU then all-reduce
+&quot;&quot;&quot;
+import math
+from collections import Counter
+
+import torch
+import torch.nn.functional as F
+
+
+# ---------------------------------------------------------------- 1 + 2. online logsumexp and entropy
+def online_entropy(logits, chunk_size=1024):
+    &quot;&quot;&quot;Entropy (in nats) of softmax(logits) along the last dim, reading the last dim in chunks.
+
+    Input:  logits (..., V) unnormalised scores; chunk_size = how many vocab entries to read at a time
+    Output: entropy (...), one number per row. Same as -(softmax(x) * log_softmax(x)).sum(-1)
+    &quot;&quot;&quot;
+    batch_shape = logits.shape[:-1]
+    vocab_size = logits.shape[-1]
+    device = logits.device
+
+    # Running statistics for every row
+    running_max = torch.full(batch_shape, float(&quot;-inf&quot;), device=device)   # m
+    running_sum_exp = torch.zeros(batch_shape, device=device)             # s = sum exp(x - m)
+    running_weighted_sum = torch.zeros(batch_shape, device=device)        # t = sum exp(x - m) * x
+
+    for start in range(0, vocab_size, chunk_size):
+        chunk = logits[..., start:start + chunk_size].float()             # (..., C)
+
+        # Step 1: the new max after seeing this chunk
+        chunk_max = chunk.max(dim=-1).values                              # (...)
+        new_max = torch.maximum(running_max, chunk_max)                   # (...)
+
+        # Step 2: rescale the old statistics from the old max to the new max
+        #         at the start running_max = -inf, so scale = exp(-inf) = 0 (correct: nothing accumulated yet)
+        scale = torch.exp(running_max - new_max)                          # (...)
+        running_sum_exp = running_sum_exp * scale
+        running_weighted_sum = running_weighted_sum * scale
+
+        # Step 3: add this chunk&#x27;s contribution, measured relative to the new max
+        exp_chunk = torch.exp(chunk - new_max.unsqueeze(-1))              # (..., C)  all &lt;= 1
+        running_sum_exp = running_sum_exp + exp_chunk.sum(dim=-1)
+        running_weighted_sum = running_weighted_sum + (exp_chunk * chunk).sum(dim=-1)
+
+        running_max = new_max
+
+    # Step 4: H = log Z - E_p[x]
+    log_partition = running_max + torch.log(running_sum_exp)              # log Z = m + log s
+    expected_logit = running_weighted_sum / running_sum_exp               # E_p[x] = t / s
+    entropy = log_partition - expected_logit
+    return entropy
+
+
+def online_logsumexp(logits, chunk_size=1024):
+    &quot;&quot;&quot;logsumexp along the last dim, reading it in chunks. Only needs (m, s).
+
+    Input:  logits (..., V)
+    Output: (...)  == torch.logsumexp(logits, dim=-1)
+    &quot;&quot;&quot;
+    batch_shape = logits.shape[:-1]
+    running_max = torch.full(batch_shape, float(&quot;-inf&quot;), device=logits.device)
+    running_sum_exp = torch.zeros(batch_shape, device=logits.device)
+
+    for start in range(0, logits.shape[-1], chunk_size):
+        chunk = logits[..., start:start + chunk_size].float()
+        new_max = torch.maximum(running_max, chunk.max(dim=-1).values)
+        running_sum_exp = running_sum_exp * torch.exp(running_max - new_max)
+        running_sum_exp = running_sum_exp + torch.exp(chunk - new_max.unsqueeze(-1)).sum(dim=-1)
+        running_max = new_max
+
+    return running_max + torch.log(running_sum_exp)
+
+
+# ---------------------------------------------------------------- 3. online cross-entropy
+def online_cross_entropy(logits, targets, chunk_size=1024):
+    &quot;&quot;&quot;Mean cross-entropy loss, reading the vocab in chunks.
+
+        CE_row = logsumexp(x) - x[target]
+
+    The target logit lives in exactly one chunk, so we pick it up when we pass that chunk.
+
+    Input:  logits (N, V); targets (N,) int64 class indices
+    Output: 0-dim tensor, == F.cross_entropy(logits, targets)
+    &quot;&quot;&quot;
+    num_rows, vocab_size = logits.shape
+    running_max = torch.full((num_rows,), float(&quot;-inf&quot;), device=logits.device)
+    running_sum_exp = torch.zeros(num_rows, device=logits.device)
+    target_logit = torch.zeros(num_rows, device=logits.device)
+
+    for start in range(0, vocab_size, chunk_size):
+        end = min(start + chunk_size, vocab_size)
+        chunk = logits[:, start:end].float()                              # (N, C)
+
+        # online logsumexp update (same as above)
+        new_max = torch.maximum(running_max, chunk.max(dim=-1).values)
+        running_sum_exp = running_sum_exp * torch.exp(running_max - new_max)
+        running_sum_exp = running_sum_exp + torch.exp(chunk - new_max.unsqueeze(-1)).sum(dim=-1)
+        running_max = new_max
+
+        # grab the target logit if the target index falls inside this chunk
+        in_this_chunk = (targets &gt;= start) &amp; (targets &lt; end)              # (N,) bool
+        local_index = (targets - start).clamp(0, end - start - 1)         # (N,) safe index into the chunk
+        picked = chunk.gather(1, local_index.unsqueeze(1)).squeeze(1)     # (N,)
+        target_logit = torch.where(in_this_chunk, picked, target_logit)
+
+    log_partition = running_max + torch.log(running_sum_exp)
+    loss_per_row = log_partition - target_logit
+    return loss_per_row.mean()
+
+
+# ---------------------------------------------------------------- 4. merging partial states
+def partial_state(chunk):
+    &quot;&quot;&quot;(m, s, t) for one chunk of logits (..., C). Treat each chunk as computed on a different worker.&quot;&quot;&quot;
+    chunk = chunk.float()
+    m = chunk.max(dim=-1).values
+    e = torch.exp(chunk - m.unsqueeze(-1))
+    s = e.sum(dim=-1)
+    t = (e * chunk).sum(dim=-1)
+    return m, s, t
+
+
+def merge_states(state_a, state_b):
+    &quot;&quot;&quot;Combine two partial states into one. Associative + commutative -&gt; any reduction order works.
+
+    Both states are rescaled to the larger of the two maxes, then added.
+    &quot;&quot;&quot;
+    m_a, s_a, t_a = state_a
+    m_b, s_b, t_b = state_b
+    m = torch.maximum(m_a, m_b)
+    scale_a = torch.exp(m_a - m)
+    scale_b = torch.exp(m_b - m)
+    s = s_a * scale_a + s_b * scale_b
+    t = t_a * scale_a + t_b * scale_b
+    return m, s, t
+
+
+def entropy_from_state(state):
+    m, s, t = state
+    return m + torch.log(s) - t / s
+
+
+# ---------------------------------------------------------------- 5. empirical entropy from a stream of samples
+class StreamingEntropy:
+    &quot;&quot;&quot;Entropy (nats) of the empirical distribution of a stream of discrete items, O(1) per update.
+
+        H = -sum_c (n_c / N) log(n_c / N) = log N - (1/N) sum_c n_c log n_c
+
+    Keep N and S = sum_c n_c log n_c. When item c arrives, only its own term changes:
+        S += (n_c + 1) log(n_c + 1) - n_c log n_c
+    &quot;&quot;&quot;
+
+    def __init__(self):
+        self.counts = Counter()
+        self.total = 0                 # N
+        self.sum_n_log_n = 0.0         # S
+
+    @staticmethod
+    def _n_log_n(n):
+        return n * math.log(n) if n &gt; 0 else 0.0
+
+    def add(self, item):
+        old_count = self.counts[item]
+        new_count = old_count + 1
+        self.sum_n_log_n += self._n_log_n(new_count) - self._n_log_n(old_count)
+        self.counts[item] = new_count
+        self.total += 1
+
+    def entropy(self):
+        if self.total == 0:
+            return 0.0
+        return math.log(self.total) - self.sum_n_log_n / self.total
+
+
+# ---------------------------------------------------------------- tests
+if __name__ == &quot;__main__&quot;:
+    torch.manual_seed(0)
+
+    def reference_entropy(x):
+        return -(F.softmax(x, dim=-1) * F.log_softmax(x, dim=-1)).sum(dim=-1)
+
+    # 1 + 2: entropy and logsumexp match torch, for chunk sizes that do / do not divide V
+    logits = torch.randn(4, 7, 50_000) * 3
+    for chunk_size in (1, 999, 1024, 50_000, 100_000):
+        if chunk_size == 1:
+            small = logits[:, :, :300]
+            assert torch.allclose(online_entropy(small, 1), reference_entropy(small), atol=1e-4)
+            continue
+        assert torch.allclose(online_entropy(logits, chunk_size), reference_entropy(logits), atol=1e-4)
+        assert torch.allclose(online_logsumexp(logits, chunk_size), torch.logsumexp(logits, -1), atol=1e-4)
+    print(&quot;1+2. online entropy / logsumexp == torch for several chunk sizes&quot;)
+
+    # numerical stability: huge logits that would overflow a naive exp
+    big = torch.randn(3, 10_000) * 5 + 1000.0
+    assert torch.isfinite(online_entropy(big)).all()
+    assert torch.allclose(online_entropy(big), reference_entropy(big), atol=1e-3)
+    # the max ordering does not matter: a sorted-ascending row forces a rescale at every chunk
+    ascending = torch.sort(torch.randn(2, 20_000) * 4, dim=-1).values
+    assert torch.allclose(online_entropy(ascending, 512), reference_entropy(ascending), atol=1e-4)
+    # sanity values: uniform -&gt; log V, one-hot-ish -&gt; ~0
+    V = 4096
+    assert abs(online_entropy(torch.zeros(1, V)).item() - math.log(V)) &lt; 1e-4
+    peaked = torch.full((1, V), -1e4)
+    peaked[0, 17] = 0.0
+    assert online_entropy(peaked).item() &lt; 1e-4
+    print(&quot;     stable at logits ~1000, uniform -&gt; log V, peaked -&gt; 0&quot;)
+
+    # 3: cross-entropy
+    x = torch.randn(64, 30_000) * 2
+    y = torch.randint(0, 30_000, (64,))
+    ours = online_cross_entropy(x, y, chunk_size=777)
+    assert torch.allclose(ours, F.cross_entropy(x, y), atol=1e-4)
+    print(f&quot;3. online CE {ours.item():.4f} == F.cross_entropy&quot;)
+
+    # 4: split the vocab into 8 shards (&quot;8 GPUs&quot;), merge in two different orders
+    shards = torch.chunk(logits, 8, dim=-1)
+    states = [partial_state(s) for s in shards]
+    left_to_right = states[0]
+    for st in states[1:]:
+        left_to_right = merge_states(left_to_right, st)
+    tree = states
+    while len(tree) &gt; 1:
+        tree = [merge_states(tree[i], tree[i + 1]) for i in range(0, len(tree), 2)]
+    assert torch.allclose(entropy_from_state(left_to_right), reference_entropy(logits), atol=1e-4)
+    assert torch.allclose(entropy_from_state(tree[0]), reference_entropy(logits), atol=1e-4)
+    print(&quot;4. merged shard states (sequential and tree reduction) == full entropy&quot;)
+
+    # 5: streaming empirical entropy
+    stream = torch.randint(0, 50, (20_000,)).tolist()
+    tracker = StreamingEntropy()
+    for item in stream:
+        tracker.add(item)
+    counts = torch.bincount(torch.tensor(stream)).double()
+    p = counts[counts &gt; 0] / counts.sum()
+    assert abs(tracker.entropy() - (-(p * p.log()).sum().item())) &lt; 1e-9
+    print(f&quot;5. streaming empirical entropy {tracker.entropy():.4f} (max log 50 = {math.log(50):.4f})&quot;)
+    print(&quot;OK&quot;)
 </code></pre></div>
 </section>
 </main>
