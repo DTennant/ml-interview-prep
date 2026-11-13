@@ -19,6 +19,7 @@ TITLES = {
     "11": "MHA + KV cache + GQA/MQA from scratch (torch)",
     "13": "LLM problems in LeetCode format (PyTorch): 21 problems, hidden tests vs torch reference",
     "14": "Online entropy / logsumexp / cross-entropy over vocab chunks, shard merging, streaming empirical entropy (torch)",
+    "15": "Streaming / chunked problems: online KL, fused linear-CE, FlashAttention fwd, Welford, Gumbel, reservoir, grad accum, packing, spec decoding, linear attn",
     "12": "Perplexity: from logits, masking, corpus aggregation, sliding window, n-gram, bits/byte",
 }
 
@@ -82,6 +83,7 @@ pre code {{ background:none; padding:14px 16px !important; font-size:12.5px; lin
 <a class="sub" href="#onlineentropy">2.3c Online entropy</a>
 <a class="sub" href="#leetcode">2.8 LeetCode 风格</a>
 <a class="sub" href="#mlleetcode">2.9 LLM × LeetCode 格式</a>
+<a class="sub" href="#streaming">2.10 Streaming / 分块题</a>
 <a href="#sysdesign">3. System Design</a>
 <a href="#numbers">4. 要背熟的数字</a>
 <a href="#code">5. 代码</a>
